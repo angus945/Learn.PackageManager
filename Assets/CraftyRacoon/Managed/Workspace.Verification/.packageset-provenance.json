@@ -1,8 +1,0 @@
-﻿{
-    "schemaVersion":  1,
-    "identity":  "Workspace.Verification",
-    "packageSet":  "PackageSet.Learn.PackageManager",
-    "sourceRepository":  "https://github.com/crafty-racoon/Workspace.Verification.git",
-    "sourceRevision":  "ae101bc9aae279a56c9bb3c0d006b1ad20d8033d",
-    "projectionKind":  "UnityAssets"
-}
