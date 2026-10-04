@@ -1,0 +1,8 @@
+{
+  "name": "Module.Verification.SystemFact.Tests",
+  "rootNamespace": "Module.Verification.SystemFact.Tests",
+  "references": ["Module.Verification.SystemFact", "Module.Verification.SystemFact.Observability"],
+  "autoReferenced": false,
+  "defineConstraints": ["NARRATIVE_DOTNET_TESTS"],
+  "noEngineReferences": true
+}

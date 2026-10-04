@@ -1,0 +1,13 @@
+{
+  "name": "Module.Verification.Diagnostics.Tests",
+  "rootNamespace": "Module.Verification.Diagnostics.Tests",
+  "references": [],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "defineConstraints": [
+    "NARRATIVE_DOTNET_TESTS"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": true
+}

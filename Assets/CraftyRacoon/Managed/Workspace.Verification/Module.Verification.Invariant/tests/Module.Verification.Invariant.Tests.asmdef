@@ -1,0 +1,8 @@
+{
+  "name": "Module.Verification.Invariant.Tests",
+  "rootNamespace": "Module.Verification.Invariant.Tests",
+  "references": ["Module.Verification.Invariant"],
+  "autoReferenced": false,
+  "defineConstraints": ["NARRATIVE_DOTNET_TESTS"],
+  "noEngineReferences": true
+}

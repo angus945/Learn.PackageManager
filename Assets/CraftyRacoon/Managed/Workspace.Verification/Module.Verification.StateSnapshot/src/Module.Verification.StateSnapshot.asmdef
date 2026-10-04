@@ -1,0 +1,7 @@
+{
+  "name": "Module.Verification.StateSnapshot",
+  "rootNamespace": "Module.Verification.StateSnapshot",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

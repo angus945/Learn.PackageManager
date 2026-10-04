@@ -1,0 +1,8 @@
+{
+  "name": "Module.Verification.TraceBuffer.Tests",
+  "rootNamespace": "Module.Verification.TraceBuffer.Tests",
+  "references": ["Module.Verification.TraceBuffer"],
+  "autoReferenced": false,
+  "defineConstraints": ["NARRATIVE_DOTNET_TESTS"],
+  "noEngineReferences": true
+}

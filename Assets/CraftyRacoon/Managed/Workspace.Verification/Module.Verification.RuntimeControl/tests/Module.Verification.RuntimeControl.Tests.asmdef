@@ -1,0 +1,8 @@
+{
+  "name": "Module.Verification.RuntimeControl.Tests",
+  "rootNamespace": "Module.Verification.RuntimeControl.Tests",
+  "references": ["Module.Verification.RuntimeControl"],
+  "autoReferenced": false,
+  "defineConstraints": ["NARRATIVE_DOTNET_TESTS"],
+  "noEngineReferences": true
+}

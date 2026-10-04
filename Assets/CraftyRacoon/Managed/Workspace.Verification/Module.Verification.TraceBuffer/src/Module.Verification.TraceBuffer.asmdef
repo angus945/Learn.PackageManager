@@ -1,0 +1,6 @@
+{
+  "name": "Module.Verification.TraceBuffer",
+  "rootNamespace": "Module.Verification.TraceBuffer",
+  "references": [],
+  "noEngineReferences": true
+}

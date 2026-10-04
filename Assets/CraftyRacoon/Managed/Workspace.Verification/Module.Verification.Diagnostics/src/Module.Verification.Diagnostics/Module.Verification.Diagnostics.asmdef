@@ -1,0 +1,7 @@
+{
+  "name": "Module.Verification.Diagnostics",
+  "rootNamespace": "Module.Verification.Diagnostics",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

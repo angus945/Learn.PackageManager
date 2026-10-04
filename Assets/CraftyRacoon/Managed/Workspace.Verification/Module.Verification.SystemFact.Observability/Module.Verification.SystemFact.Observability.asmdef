@@ -1,0 +1,7 @@
+{
+  "name": "Module.Verification.SystemFact.Observability",
+  "rootNamespace": "Module.Verification.SystemFact.Observability",
+  "references": ["Module.Verification.SystemFact"],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

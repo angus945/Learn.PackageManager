@@ -1,0 +1,1589 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workspace.Verification dependency graph</title>
+  <style>
+    :root{
+      color-scheme:light dark;
+      --bg:#f5f7fa;
+      --surface:#fff;
+      --surface-subtle:#f8fafc;
+      --text:#17202a;
+      --muted:#697386;
+      --border:#b8c0cc;
+      --edge:#596579;
+      --focus:#111827;
+      --highlight:#2563eb;
+      --highlight-soft:color-mix(in srgb,var(--highlight) 18%,transparent);
+      --group-border:hsl(var(--owner-hue) 62% 52% / .58);
+      --group-fill:hsl(var(--owner-hue) 72% 56% / .11);
+      --group-accent:hsl(var(--owner-hue) 68% 54% / .34);
+      --group-label:hsl(var(--owner-hue) 68% 46%);
+      --unreferenced-fill:color-mix(in srgb,var(--surface) 58%,var(--bg));
+      --unreferenced-border:color-mix(in srgb,var(--border) 52%,var(--surface))
+    }
+    *{box-sizing:border-box}
+    body{margin:0;overflow:hidden;font-family:Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:24px 30px 18px;background:var(--surface);border-bottom:1px solid var(--border)}
+    h1{margin:0 0 6px;font-size:22px}
+    p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+    .hint{margin-top:10px;font-size:12px}
+    .legend{
+      display:flex;
+      align-items:center;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-top:14px;
+      color:var(--muted);
+      font-size:11px
+    }
+    .legend span{display:inline-flex;align-items:center;gap:7px}
+    .swatch{width:30px;border-top:2px solid var(--edge)}
+    .display-modes{
+      display:inline-flex;
+      gap:4px;
+      margin-left:8px;
+      padding:3px;
+      border:1px solid var(--border);
+      border-radius:9px;
+      background:var(--surface-subtle)
+    }
+    .display-mode{
+      border:0;
+      border-radius:6px;
+      padding:5px 9px;
+      background:transparent;
+      color:var(--muted);
+      font:inherit;
+      cursor:pointer
+    }
+    .display-mode.active{
+      background:var(--surface);
+      color:var(--text);
+      box-shadow:0 1px 4px rgba(15,23,42,.12)
+    }
+    .mode-hidden{display:none!important}
+    .zoom-status{
+      margin-left:auto;
+      padding:3px 8px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      color:var(--muted);
+      font-variant-numeric:tabular-nums
+    }
+    .viewport{
+      margin:22px;
+      height:calc(100vh - 190px);
+      min-height:320px;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--surface);
+      overscroll-behavior:contain;
+      scrollbar-gutter:stable both-edges
+    }
+    .viewport.panning{
+      cursor:grabbing;
+      user-select:none
+    }
+    .viewport.auto-scrolling{
+      cursor:all-scroll
+    }
+    .autoscroll-indicator{
+      position:fixed;
+      z-index:1000;
+      display:none;
+      width:34px;
+      height:34px;
+      border:2px solid var(--highlight);
+      border-radius:50%;
+      background:color-mix(in srgb,var(--surface) 90%,transparent);
+      box-shadow:0 3px 12px rgba(0,0,0,.22);
+      pointer-events:none;
+      transform:translate(-50%,-50%)
+    }
+    .autoscroll-indicator.active{display:block}
+    .autoscroll-indicator::before,
+    .autoscroll-indicator::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      top:50%;
+      background:var(--highlight);
+      transform:translate(-50%,-50%)
+    }
+    .autoscroll-indicator::before{width:18px;height:2px}
+    .autoscroll-indicator::after{width:2px;height:18px}
+    .zoom-surface{position:relative}
+    .canvas{
+      position:absolute;
+      left:0;
+      top:0;
+      transform-origin:0 0;
+      will-change:transform
+    }
+    .layer-band{
+      position:absolute;
+      left:0;
+      right:0;
+      z-index:0;
+      border-top:2px solid color-mix(in srgb,var(--border) 78%,transparent);
+      pointer-events:none
+    }
+    .layer-label{
+      position:absolute;
+      left:24px;
+      width:100px;
+      z-index:4;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:600;
+      pointer-events:none
+    }
+    .ownership-group{
+      position:absolute;
+      z-index:0;
+      border:2px solid var(--group-border);
+      border-radius:14px;
+      background:var(--group-fill);
+      box-shadow:inset 0 3px 0 var(--group-accent);
+      pointer-events:none
+    }
+    .ownership-label{
+      position:absolute;
+      left:12px;
+      top:7px;
+      max-width:calc(100% - 24px);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:var(--group-label);
+      font-size:10px;
+      font-weight:650;
+      letter-spacing:.015em
+    }
+    .node{
+      position:absolute;
+      z-index:3;
+      min-width:280px;
+      min-height:84px;
+      padding:14px 16px;
+      border:1.5px solid var(--border);
+      border-radius:10px;
+      background:var(--surface);
+      box-shadow:0 3px 10px rgba(15,23,42,.08);
+      cursor:pointer;
+      user-select:none;
+      transition:opacity .14s ease,border-color .14s ease,box-shadow .14s ease,transform .14s ease
+    }
+    .node:hover{border-color:var(--focus)}
+    .node:focus-visible{outline:3px solid var(--highlight-soft);outline-offset:2px}
+    .node.focus{border:3px solid var(--focus)}
+    .node.unresolved{border-style:dashed}
+    .node.unreferenced,
+    .node.root-detached{
+      opacity:.52;
+      background:var(--unreferenced-fill);
+      border-color:var(--unreferenced-border);
+      box-shadow:none
+    }
+    .node.unreferenced:hover,
+    .node.unreferenced.selected,
+    .node.unreferenced.dependency,
+    .node.unreferenced.hover-related,
+    .node.unreferenced.hover-source,
+    .node.root-detached:hover,
+    .node.root-detached.selected,
+    .node.root-detached.dependency,
+    .node.root-detached.hover-related,
+    .node.root-detached.hover-source{
+      opacity:1
+    }
+    .node.selected{
+      border-color:var(--highlight);
+      box-shadow:0 0 0 4px var(--highlight-soft),0 5px 16px rgba(15,23,42,.12);
+      transform:translateY(-1px)
+    }
+    .node.dependency,
+    .node.hover-related{
+      border-color:var(--highlight);
+      box-shadow:0 0 0 2px var(--highlight-soft)
+    }
+    .node.hover-source{
+      border-color:var(--highlight);
+      box-shadow:0 0 0 3px var(--highlight-soft)
+    }
+    .node.dimmed{opacity:.16}
+    .title{
+      font-size:13px;
+      font-weight:650;
+      white-space:nowrap;
+      overflow-wrap:normal
+    }
+    .meta{margin-top:9px;color:var(--muted);font-size:11px}
+    svg{
+      position:absolute;
+      inset:0;
+      z-index:2;
+      overflow:visible;
+      pointer-events:none
+    }
+    .edge{
+      fill:none;
+      stroke:var(--edge);
+      stroke-width:1.45;
+      opacity:.045;
+      transition:opacity .12s ease,stroke .12s ease,stroke-width .12s ease;
+      marker-end:url(#arrow)
+    }
+    .edge.hovered{
+      opacity:.88;
+      stroke-width:2.25
+    }
+    .edge.highlighted{
+      stroke:var(--highlight);
+      stroke-width:3;
+      opacity:1;
+      marker-end:url(#arrow-highlight)
+    }
+    .edge.dimmed{opacity:.012}
+    .architecture-summary{
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:5px 9px;
+      background:var(--surface-subtle);
+      color:var(--text);
+      font:inherit;
+      cursor:pointer
+    }
+    .architecture-summary.has-findings{
+      border-color:#b45309;
+      color:#b45309
+    }
+    .inspector{
+      position:fixed;
+      z-index:80;
+      top:150px;
+      right:22px;
+      bottom:22px;
+      width:min(520px,calc(100vw - 44px));
+      display:none;
+      flex-direction:column;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--surface);
+      box-shadow:0 18px 48px rgba(15,23,42,.22);
+      overflow:hidden
+    }
+    .inspector.open{display:flex}
+    .inspector-header{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      background:var(--surface-subtle)
+    }
+    .inspector-title{
+      flex:1;
+      min-width:0;
+      font-size:14px;
+      font-weight:700;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap
+    }
+    .inspector-close{
+      width:30px;
+      height:30px;
+      border:1px solid var(--border);
+      border-radius:7px;
+      background:var(--surface);
+      color:var(--text);
+      cursor:pointer
+    }
+    .inspector-body{
+      padding:14px 16px 28px;
+      overflow:auto;
+      font-size:12px;
+      line-height:1.5
+    }
+    .inspector-section{margin:0 0 18px}
+    .inspector-section h3{
+      margin:0 0 8px;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      color:var(--muted)
+    }
+    .inspector-meta{
+      color:var(--muted);
+      margin-bottom:8px
+    }
+    .evidence-edge{
+      margin:0 0 8px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--surface-subtle)
+    }
+    .evidence-edge summary{
+      padding:8px 10px;
+      cursor:pointer;
+      font-weight:650
+    }
+    .evidence-list{
+      margin:0;
+      padding:0 10px 10px 28px;
+      color:var(--muted)
+    }
+    .evidence-list code{
+      color:var(--text);
+      overflow-wrap:anywhere
+    }
+    .finding{
+      margin:0 0 8px;
+      padding:9px 10px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--surface-subtle)
+    }
+    .finding.error{border-left:4px solid #b91c1c}
+    .finding.warning{border-left:4px solid #b45309}
+    .finding-rule{font-weight:750;margin-right:6px}
+    .readme{
+      margin:0;
+      padding:12px;
+      max-height:50vh;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--bg);
+      color:var(--text);
+      font:11px/1.45 Consolas,"SFMono-Regular",monospace;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere
+    }
+    .empty-state{color:var(--muted);font-style:italic}
+    .rule-list{margin:0;padding-left:20px}
+    @media(prefers-color-scheme:dark){
+      :root{
+        --bg:#0e1116;
+        --surface:#151a21;
+        --surface-subtle:#191f27;
+        --text:#edf1f5;
+        --muted:#a4adba;
+        --border:#394251;
+        --edge:#8b96a5;
+        --focus:#f8fafc;
+        --highlight:#60a5fa
+      }
+      .ownership-group{
+        --group-border:hsl(var(--owner-hue) 68% 66% / .62);
+        --group-fill:hsl(var(--owner-hue) 74% 62% / .12);
+        --group-accent:hsl(var(--owner-hue) 72% 68% / .38);
+        --group-label:hsl(var(--owner-hue) 78% 72%)
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Workspace.Verification dependency graph</h1>
+    <p>Layer 0 is the repository root. Non-root containers are flattened into ownership groups so actual module/framework dependencies remain primary.</p>
+    <p class="hint">Hover: direct dependencies. Click nodes for dependency highlighting. Left-drag background to pan. Middle-click starts directional auto-scroll. Mouse wheel zooms around the pointer. Esc clears selection/auto-scroll.</p>
+    <div class="legend"><span><i class="swatch"></i>depends on</span><div class="display-modes" role="group" aria-label="Display mode"><button type="button" class="display-mode active" data-display-mode="all">All nodes</button><button type="button" class="display-mode" data-display-mode="referenced">Hide unreferenced</button></div><button type="button" id="architecture-summary" class="architecture-summary">Architecture</button><span id="zoom-status" class="zoom-status">100%</span></div>
+  </header>
+  <div id="graph-viewport" class="viewport">
+    <div id="zoom-surface" class="zoom-surface" style="width:2892px;height:462px">
+      <div id="graph-canvas" class="canvas" data-layout="barycentric" data-base-width="2892" data-base-height="462" style="width:2892px;height:462px">
+        <div class="layer-band" data-layer="0" style="top:48px"></div>
+        <div class="layer-label" data-layer="0" style="top:140px">Layer 0</div>
+        <div class="layer-band" data-layer="1" style="top:248px"></div>
+        <div class="layer-label" data-layer="1" style="top:340px">Layer 1</div>
+        <div class="ownership-group" data-owner="Workspace.Verification" data-layer="0" data-owner-hue="107" style="--owner-hue:107deg;left:1088.5px;top:72px;width:411px;height:140px">
+          <div class="ownership-label">Workspace.Verification</div>
+        </div>
+        <div class="ownership-group" data-owner="Workspace.Verification" data-layer="1" data-owner-hue="107" style="--owner-hue:107deg;left:132px;top:272px;width:2698px;height:140px">
+          <div class="ownership-label">Workspace.Verification</div>
+        </div>
+        <svg id="graph-svg" width="2892" height="462" viewBox="0 0 2892 462" aria-hidden="true">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,8 L9,4 z" fill="#596579"/></marker>
+            <marker id="arrow-highlight" markerWidth="10" markerHeight="10" refX="9" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,8 L9,4 z" fill="#2563eb"/></marker>
+          </defs>
+          <path class="edge" data-relation="depends-on" data-source="Module.Verification.SystemFact.Observability" data-target="Module.Verification.SystemFact" d="M 1294 190 C 1294 248, 626 248, 626 306"><title>Module.Verification.SystemFact.Observability → Module.Verification.SystemFact · depends on</title></path>
+          <path class="edge" data-relation="depends-on" data-source="Module.Verification.SystemFact.Observability" data-target="Workspace.Verification" d="M 1481.5 148 C 1481.5 148, 1575.5 148, 1575.5 148"><title>Module.Verification.SystemFact.Observability → Workspace.Verification · depends on</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.Diagnostics" d="M 1715.5 190 C 1715.5 248, 290 248, 290 306"><title>Workspace.Verification → Module.Verification.Diagnostics · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.Evidence" d="M 1715.5 190 C 1715.5 248, 962 248, 962 306"><title>Workspace.Verification → Module.Verification.Evidence · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.Invariant" d="M 1715.5 190 C 1715.5 248, 1298 248, 1298 306"><title>Workspace.Verification → Module.Verification.Invariant · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.Oracle" d="M 1715.5 190 C 1715.5 248, 1634 248, 1634 306"><title>Workspace.Verification → Module.Verification.Oracle · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.RuntimeControl" d="M 1715.5 190 C 1715.5 248, 1979.5 248, 1979.5 306"><title>Workspace.Verification → Module.Verification.RuntimeControl · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.StateSnapshot" d="M 1715.5 190 C 1715.5 248, 2330.5 248, 2330.5 306"><title>Workspace.Verification → Module.Verification.StateSnapshot · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.SystemFact" d="M 1715.5 190 C 1715.5 248, 626 248, 626 306"><title>Workspace.Verification → Module.Verification.SystemFact · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.SystemFact.Observability" d="M 1855.5 148 C 1855.5 148, 1106.5 148, 1106.5 148"><title>Workspace.Verification → Module.Verification.SystemFact.Observability · contains</title></path>
+          <path class="edge" data-relation="contains" data-source="Workspace.Verification" data-target="Module.Verification.TraceBuffer" d="M 1715.5 190 C 1715.5 248, 2672 248, 2672 306"><title>Workspace.Verification → Module.Verification.TraceBuffer · contains</title></path>
+        </svg>
+        <div class="node" data-node="Module.Verification.SystemFact.Observability" data-layer="0" data-order="0" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.SystemFact.Observability" style="left:1106.5px;top:106px;width:375px">
+          <div class="title">Module.Verification.SystemFact.Observability</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node focus" data-node="Workspace.Verification" data-layer="0" data-order="1" data-owner="" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Workspace.Verification" style="left:1575.5px;top:106px;width:280px">
+          <div class="title">Workspace.Verification</div>
+          <div class="meta">workspace · repository · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.Diagnostics" data-layer="1" data-order="0" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.Diagnostics" style="left:150px;top:306px;width:280px">
+          <div class="title">Module.Verification.Diagnostics</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.SystemFact" data-layer="1" data-order="1" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.SystemFact" style="left:486px;top:306px;width:280px">
+          <div class="title">Module.Verification.SystemFact</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.Evidence" data-layer="1" data-order="2" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.Evidence" style="left:822px;top:306px;width:280px">
+          <div class="title">Module.Verification.Evidence</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.Invariant" data-layer="1" data-order="3" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.Invariant" style="left:1158px;top:306px;width:280px">
+          <div class="title">Module.Verification.Invariant</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.Oracle" data-layer="1" data-order="4" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.Oracle" style="left:1494px;top:306px;width:280px">
+          <div class="title">Module.Verification.Oracle</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.RuntimeControl" data-layer="1" data-order="5" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.RuntimeControl" style="left:1830px;top:306px;width:299px">
+          <div class="title">Module.Verification.RuntimeControl</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.StateSnapshot" data-layer="1" data-order="6" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.StateSnapshot" style="left:2185px;top:306px;width:291px">
+          <div class="title">Module.Verification.StateSnapshot</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+        <div class="node" data-node="Module.Verification.TraceBuffer" data-layer="1" data-order="7" data-owner="Workspace.Verification" data-root-reachable="true" tabindex="0" role="button" aria-label="Highlight dependencies of Module.Verification.TraceBuffer" style="left:2532px;top:306px;width:280px">
+          <div class="title">Module.Verification.TraceBuffer</div>
+          <div class="meta">module · local unit &#183; owner Workspace.Verification · available</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="autoscroll-indicator" class="autoscroll-indicator" aria-hidden="true"></div>
+  <aside id="graph-inspector" class="inspector" aria-live="polite"><div class="inspector-header"><div id="inspector-title" class="inspector-title">Inspector</div><button type="button" id="inspector-close" class="inspector-close" aria-label="Close inspector">×</button></div><div id="inspector-body" class="inspector-body"></div></aside>
+  <script id="graph-inspector-data" type="application/json">
+{"nodes":[{"id":"Module.Verification.Diagnostics","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.diagnostics\r\n\r\nImmutable, source-neutral diagnostic descriptions and an observation sink\r\ncontract. This standalone source module has no Narrative, Editor, Unity,\r\nexternal-package or platform I/O dependency.\r\n\r\nThe library targets \u0060netstandard2.1\u0060 with C# 9; tests target \u0060net10.0\u0060.\r\nThis matches the existing neutral deterministic modules. The target permits\r\ncompatible hosts to consume the assembly; it does not establish tested support\r\nfor a particular Unity version or source compiler.\r\n\r\n## Responsibilities\r\n\r\n- \u0060DiagnosticDescriptor\u0060 defines a producer-owned identity and default metadata.\r\n- \u0060Diagnostic\u0060 preserves actual severity, fallback message, source locations,\r\n  structured string properties and optional ordered message arguments.\r\n- \u0060DiagnosticReport\u0060 adds one occurrence and optional host observation context.\r\n- \u0060IDiagnosticSink\u0060 observes a report without deciding execution outcome.\r\n- \u0060CollectingDiagnosticSink\u0060 keeps a bounded, thread-safe in-memory history.\r\n\r\nLanguage rules, execution state, exception logging, static analysis snapshots,\r\nUI navigation, wire serialization and delivery failure policy belong to the\r\nowning producer or host. This module does not create a global service or clock.\r\n\r\nLanguage, Flow, Runtime, assets, schema, settings and templates create this model\r\ndirectly through producer-owned factories. There is no migration adapter layer.\r\nEditor Application owns validation snapshots and Preview event history.\r\n\u0060WorkspaceDocumentOperationResult.Diagnostic\u0060 provides failure content for\r\ndocument operations while preserving existing status and code values;\r\nsuccessful, unchanged and committed results have no failure diagnostic.\r\nControl publishes explicit DTO projections at the Web boundary.\r\n\r\n## Use\r\n\r\n\u0060\u0060\u0060csharp\r\nusing Module.Verification.Diagnostics;\r\n\r\nDiagnosticDescriptor descriptor = new DiagnosticDescriptor(\u0022sample.validator\u0022, \u0022missing.parameter\u0022, DiagnosticSeverity.Error);\r\nDiagnosticTextSpan span = new DiagnosticTextSpan(8, 5, 1, 9);\r\nDiagnosticLocation location = new DiagnosticLocation(\u0022script:1\u0022, \u0022revision:3\u0022, span, \u0022parameters.actor\u0022);\r\nDiagnostic diagnostic = new Diagnostic(descriptor, \u0022Actor is required.\u0022, location: location);\r\nDiagnosticReport report = new DiagnosticReport(diagnostic, \u0022operation:4/occurrence:1\u0022, operationId: \u0022operation:4\u0022);\r\nCollectingDiagnosticSink sink = new CollectingDiagnosticSink(256);\r\nsink.Report(report);\r\n\u0060\u0060\u0060\r\n\r\nThe producer supplies stable IDs. The operation owner commits its result before\r\nthe host observation boundary publishes the report. Host adapters must isolate\r\nsink failures so output behavior cannot replace that result.\r\n\r\nSee [contracts.md](docs/contracts.md) for identity, coordinates, immutability,\r\nretention, observation and serialization rules.\r\n\r\n## Verification\r\n\r\nFrom the NarrativeEditor root:\r\n\r\n\u0060\u0060\u0060powershell\r\ndotnet test modules/module.verification.diagnostics/tests/Module.Verification.Diagnostics.Tests/Module.Verification.Diagnostics.Tests.csproj -c Release\r\n\u0060\u0060\u0060\r\n\r\nFrom this directory:\r\n\r\n\u0060\u0060\u0060powershell\r\ndotnet test tests/Module.Verification.Diagnostics.Tests/Module.Verification.Diagnostics.Tests.csproj -c Release\r\n\u0060\u0060\u0060\r\n\r\nThe focused tests cover neutral assembly dependencies, immutable collections,\r\nproducer/code identity, optional coordinates, UTF-16 examples, concurrent\r\ndelivery, bounded retention and duplicate versus distinct occurrences.\r\n","truncated":false}},{"id":"Module.Verification.Evidence","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.evidence\r\n\r\nImmutable evidence manifests, bounded bundle construction and a sink contract.\r\n\r\nThe module records finite references and metadata for fact streams, state snapshots, evaluations, traces, diagnostics, attachments and replay recordings. It does not duplicate operation state, facts, snapshots, diagnostics or oracle results. The host owns concrete JSON, file, database and CI artifact integrations.\r\n\r\nThe assembly targets \u0060netstandard2.1\u0060, uses C# 9, and has no Unity, Simulation or Playback dependency.\r\n\r\n\u0060EvidenceReference\u0060 has value identity. \u0060EvidenceEntry\u0060 contains kind, reference, label and copied metadata; it never owns the referenced payload. This public contract is frozen.\r\n","truncated":false}},{"id":"Module.Verification.Invariant","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.invariant\r\n\r\n\u7D14 C# \u898F\u5247\u8A55\u4F30\u6A5F\u5236\uFF0C\u7121 Unity\u3001simulation\u3001testability framework \u4F9D\u8CF4\u3002\r\n\r\n- \u0060src/API/IInvariant\u003CT\u003E\u0060\uFF1A\u5C0D committed context \u8A55\u4F30\uFF0C\u56DE\u50B3\u660E\u78BA\u7684 \u0060InvariantResult\u0060\uFF1B\u9055\u898F\u5167\u5BB9\u7531 \u0060InvariantViolation\u0060 \u8868\u793A\u3002\r\n- \u0060src/Contract\u0060\uFF1A\u7A69\u5B9A code \u8207\u8A3A\u65B7 detail\u3002\r\n- \u0060src/Runtime/InvariantRegistry\u003CT\u003E\u0060\uFF1A\u91CD\u8907\u6AA2\u67E5\u3001Seal\u3001ordinal code \u6392\u5E8F\u3001\u552F\u8B80\u7D50\u679C\u3002\r\n- \u0060tests\u0060\uFF1A\u9396\u5B9A\u3001\u9806\u5E8F\u3001\u7D50\u679C\u526F\u672C\u8207 exception \u884C\u70BA\u3002\r\n\r\n\u898F\u5247\u7684 Code \u5FC5\u9808\u5728\u8A3B\u518A\u5F8C\u4FDD\u6301\u4E0D\u8B8A\uFF1BEvaluate \u4E0D\u61C9\u4FEE\u6539\u88AB\u89C0\u5BDF\u7684 gameplay\u3002\r\nSeal \u5F8C\u4E0D\u53EF\u589E\u52A0\u898F\u5247\uFF0CSeal \u524D\u4E0D\u53EF Evaluate\u3002\u4F8B\u5916\u76F4\u63A5\u4EA4\u7D66 caller\uFF0C\u4E0D\u507D\u88DD\u6210\u4E00\u822C invariant violation\u3002\r\nModule \u4E0D\u5B9A\u7FA9\u5065\u5EB7\u503C\u3001\u89D2\u8272\u751F\u547D\u9031\u671F\u6216\u4EFB\u4F55\u904A\u6232\u898F\u5247\uFF1B\u4E0D\u6C7A\u5B9A\u8A55\u4F30\u6642\u6A5F\u3001Session Faulted \u653F\u7B56\u3001trace \u6216 UI\u3002\r\n\r\n\u6B63\u5F0F namespace \u70BA \u0060Module.Verification.Invariant\u0060\u3002Invariant \u4E0D\u4F9D\u8CF4 Oracle\u3001\u4E0D\u4FDD\u5B58 history\uFF0C\u4E5F\u4E0D\u76F4\u63A5\u6210\u70BA SystemFact\uFF1B\u9700\u8981\u767C\u5E03\u6642\u7531 host adapter \u8F49\u63DB\u3002\r\nInvariantViolation \u4FDD\u7559\u820A serialization contract identity\uFF1BJSON \u7684 code/detail \u6B04\u4F4D\u4E0D\u8B8A\u3002\r\n\u6B64 public contract \u5DF2 freeze\u3002\r\n","truncated":false}},{"id":"Module.Verification.Oracle","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.oracle\r\n\r\nPassive, ordered evaluation of immutable caller-provided contexts.\r\n\r\nThe module distinguishes test verdicts from operation outcomes, preserves stable oracle order, classifies evaluation exceptions as infrastructure errors, and never captures observations, submits operations, waits, persists evidence or controls a target.\r\n\r\nThe assembly targets \u0060netstandard2.1\u0060, uses C# 9, and has no Unity, Simulation or Playback dependency.\r\n\r\nOracle does not retain runtime history, control runtime, store diagnostics or own evidence. Its public expectation-judgment contract is frozen.\r\n","truncated":false}},{"id":"Module.Verification.RuntimeControl","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.runtime-control\r\n\r\nCaller-driven operation admission, handles, completion state and bounded result lookup.\r\n\r\nThe module never waits, retries, captures observations, evaluates test verdicts, resets an environment or creates a second product path. The adopting host performs business validation and executes the admitted operation through its normal application entry point.\r\n\r\n\u0060IOperationTransitionObserver\u003CTResult\u003E\u0060 is the only passive transition seam. It observes authoritative registry transitions but does not own or mutate registry state. A host adapter may translate those transitions into system facts; this module does not reference SystemFact. The public operation model and lifecycle are frozen.\r\n\r\nThe assembly targets \u0060netstandard2.1\u0060, uses C# 9, and has no Unity, Simulation or Playback dependency.\r\n","truncated":false}},{"id":"Module.Verification.StateSnapshot","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.state-snapshot\r\n\r\nHost-published immutable state snapshots with stable channel-local capture identity and bounded retention.\r\n\r\n\u0060Read\u0060 never performs capture. A host publishes at its own safe consistency boundary, and readers can only read the latest or a specifically retained snapshot. Capture failures are retained without replacing them with a partial snapshot.\r\n\r\nPublic vocabulary is \u0060StateSnapshotChannel\u0060, \u0060StateSnapshotReference\u0060, \u0060StateSnapshotReferenceCodec\u0060, \u0060StateSnapshotRead\u003CTSnapshot\u003E\u0060, \u0060IStateSnapshotReader\u003CTSnapshot\u003E\u0060 and \u0060IStateSnapshotPublisher\u003CTSnapshot\u003E\u0060. This module does not define facts or event metadata.\r\n\r\nThe reference contains only channel and capture identity. Tick, source, scope, epoch, trace and correlation data belong to the immutable product snapshot when they are part of that product\u0027s semantics. The channel publishes and retains the supplied payload reference but never mutates it; callers must supply immutable payloads.\r\n\r\n\u0060StateSnapshotReferenceCodec\u0060 defines the canonical text representation of a reference as \u0060\u003Cchannel-id-N\u003E:\u003Ccapture-id\u003E\u0060. The channel identity uses the 32-digit GUID \u0060N\u0060 format and the capture identity uses invariant-culture decimal digits. Decoding rejects empty channel identities, non-positive capture identities and non-canonical values.\r\n\r\nThis public contract is frozen. The module does not dispatch facts, evaluate diagnostics or oracles, retain traces or evidence, or own replay history.\r\n\r\nThe assembly targets \u0060netstandard2.1\u0060, uses C# 9, has no Unity, Simulation, Playback or I/O dependency, and keeps a bounded in-memory history.\r\n","truncated":false}},{"id":"Module.Verification.SystemFact","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.system-fact\r\n\r\n\u0060module.verification.system-fact\u0060 \u5B9A\u7FA9\u8DE8\u6A21\u7D44\u5171\u7528\u7684\u300C\u7CFB\u7D71\u4E8B\u5BE6\uFF08System Fact\uFF09\u300D\u5951\u7D04\u3002\r\n\r\nSystem Fact \u8868\u793A\uFF1A\r\n\r\n\u003E \u7CFB\u7D71\u4E2D\u5DF2\u7D93\u767C\u751F\u7684\u4E8B\u5BE6\u3002\r\n\r\n\u4F8B\u5982\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nDamageApplied\r\nQuestCompleted\r\nSaveLoaded\r\nCommandCompleted\r\nTickCompleted\r\n\u0060\u0060\u0060\r\n\r\n\u672C Module \u5B9A\u7FA9\u552F\u4E00\u7684 factual language\uFF0C\u4EE5\u53CA\u521D\u59CB\u5316\u671F\u5EFA\u69CB\u3001\u57F7\u884C\u671F\u4E0D\u53EF\u8B8A\u7684\u89C0\u5BDF\u8DEF\u7531\u3002\r\n\r\n## Public API\r\n\r\n\u0060\u0060\u0060csharp\r\nnamespace Module.Verification.SystemFact\r\n{\r\n    public interface ISystemFact\r\n    {\r\n    }\r\n\r\n    public interface IDomainFact : ISystemFact\r\n    {\r\n    }\r\n\r\n    public interface IApplicationFact : ISystemFact\r\n    {\r\n    }\r\n\r\n    public interface IExecutionFact : ISystemFact\r\n    {\r\n    }\r\n}\r\n\u0060\u0060\u0060\r\n\r\n### \u0060IDomainFact\u0060\r\n\r\n\u63CF\u8FF0 Domain \u4E2D\u5DF2\u7D93\u767C\u751F\u7684\u4E8B\u60C5\u3002\r\n\r\n\u0060\u0060\u0060text\r\nDamageApplied\r\nCharacterKilled\r\nQuestCompleted\r\n\u0060\u0060\u0060\r\n\r\n### \u0060IApplicationFact\u0060\r\n\r\n\u63CF\u8FF0 Application Use Case \u6216\u5354\u8ABF\u6D41\u7A0B\u7522\u751F\u7684\u4E8B\u60C5\u3002\r\n\r\n\u0060\u0060\u0060text\r\nSaveImported\r\nDefinitionReloaded\r\nGameSessionStarted\r\n\u0060\u0060\u0060\r\n\r\n### \u0060IExecutionFact\u0060\r\n\r\n\u63CF\u8FF0 Runtime \u6216\u57F7\u884C\u6A5F\u5236\u767C\u751F\u7684\u4E8B\u60C5\u3002\r\n\r\n\u0060\u0060\u0060text\r\nCommandStarted\r\nCommandCompleted\r\nCommandFailed\r\nTickStarted\r\nTickCompleted\r\n\u0060\u0060\u0060\r\n\r\n## Fact \u7684\u64C1\u6709\u6B0A\r\n\r\n\u5177\u9AD4 Fact \u61C9\u7531\u771F\u6B63\u64C1\u6709\u8A72\u8A9E\u610F\u7684 Module \u5B9A\u7FA9\u3002\r\n\r\n\u0060\u0060\u0060text\r\nmodule.combat\r\n\u2514\u2500\u2500 DamageApplied : IDomainFact\r\n\r\nmodule.quest\r\n\u2514\u2500\u2500 QuestCompleted : IDomainFact\r\n\r\nmodule.fixed-tick\r\n\u2514\u2500\u2500 TickCompleted : IExecutionFact\r\n\u0060\u0060\u0060\r\n\r\n\u0060module.verification.system-fact\u0060 \u4E0D\u96C6\u4E2D\u4FDD\u5B58\u6240\u6709 Fact\u3002\r\n\r\n## \u8A2D\u8A08\u898F\u5247\r\n\r\nFact \u61C9\u63CF\u8FF0\u300C\u5DF2\u7D93\u767C\u751F\u300D\u7684\u4E8B\u60C5\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nDamageApplied     \u2713\r\nQuestCompleted    \u2713\r\n\r\nApplyDamage       \u2717\r\nCompleteQuest     \u2717\r\n\u0060\u0060\u0060\r\n\r\nFact \u5EFA\u7ACB\u5F8C\u61C9\u4FDD\u6301\u4E0D\u53EF\u8B8A\u3002\r\n\r\nFact \u672C\u8EAB\u4E0D\u5305\u542B hub observation metadata\uFF0C\u4F8B\u5982\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nTick\r\nTraceId\r\nCorrelationId\r\n\u0060\u0060\u0060\r\n\r\n\u9019\u4E9B\u61C9\u7531\u5916\u90E8 Observability \u7CFB\u7D71\u9644\u52A0\u3002\r\n\r\n\u0060FactObservationContext\u0060 \u7684 \u0060Sequence\u0060 \u662F\u55AE\u4E00 hub \u63A5\u53D7\u6BCF\u6B21\u5408\u6CD5 Publish \u7684 global monotonic observation order\uFF0C\u0060Timestamp\u0060 \u662F\u8A72\u6B21\u63A5\u53D7\u6642\u9593\u3002\u5B83\u5011\u4E0D\u662F tick\u3001domain version\u3001\u8DE8\u7A0B\u5E8F\u6392\u5E8F\u6216 persistent id\u3002\r\n\r\n## \u4E0D\u8CA0\u8CAC\r\n\r\n\u672C Module \u4E0D\u63D0\u4F9B\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nEvent Bus\r\nLogging\r\nMetrics\r\nTracing\r\nReplay\r\nSerialization\r\nUnity Integration\r\n\u0060\u0060\u0060\r\n\r\n\u9019\u4E9B\u80FD\u529B\u61C9\u7531\u5176\u4ED6 Module \u6216 Framework \u63D0\u4F9B\u3002\r\n\r\n## \u6838\u5FC3\u539F\u5247\r\n\r\n\u0060module.verification.system-fact\u0060 \u53EA\u56DE\u7B54\uFF1A\r\n\r\n\u003E **\u9019\u662F\u4E00\u500B\u4EC0\u9EBC\u985E\u578B\u7684\u3001\u5DF2\u7D93\u767C\u751F\u7684\u7CFB\u7D71\u4E8B\u5BE6\uFF1F**\r\n\r\n\u5B83\u4E0D\u8655\u7406\uFF1A\r\n\r\n\u003E \u5982\u4F55\u4FDD\u5B58 trace\u3001\u63A7\u5236 runtime\u3001\u5224\u65B7 expectation \u6216\u6301\u4E45\u5316\uFF1F\r\n\r\n\u0060SystemFactHubBuilder\u0060 \u53EA\u5728 Build \u524D\u8A3B\u518A assignable routes\u3002Build \u5F8C topology immutable\uFF1Bobserver \u5931\u6557\u7531 \u0060IObservationFailureSink\u0060 \u56DE\u5831\u4E14\u4E0D\u7834\u58DE producer flow\u3002\u6B64 public contract \u5DF2 freeze\u3002\r\n","truncated":false}},{"id":"Module.Verification.SystemFact.Observability","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# Module.Verification.SystemFact.Observability\r\n\r\n\u0060Module.Verification.SystemFact.Observability\u0060 \u63D0\u4F9B \u0060ISystemFact\u0060 \u7684\u89C0\u5BDF\u8207\u5206\u6D3E\u6A5F\u5236\u3002\r\n\r\n\u4F9D\u8CF4\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nModule.Verification.SystemFact\r\n\u0060\u0060\u0060\r\n\r\n## \u8CAC\u4EFB\r\n\r\n\u672C Module \u8CA0\u8CAC\uFF1A\r\n\r\n- \u63A5\u6536 \u0060ISystemFact\u0060\r\n- \u5EFA\u7ACB Observation Context\r\n- \u5C07 Fact \u8DEF\u7531\u81F3\u5C0D\u61C9 Observer\r\n- \u9694\u96E2 Observer \u5931\u6557\uFF0C\u907F\u514D\u5F71\u97FF\u4E3B\u6D41\u7A0B\r\n\r\n\u6838\u5FC3\u6D41\u7A0B\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nISystemFact\r\n    \u2193\r\nISystemFactSink\r\n    \u2193\r\nSystemFactHub\r\n    \u2193\r\nISystemFactObserver\u003CTFact\u003E\r\n\u0060\u0060\u0060\r\n\r\n## \u4E3B\u8981 API\r\n\r\n\u0060\u0060\u0060text\r\nISystemFactSink\r\nISystemFactObserver\u003CTFact\u003E\r\nObservedFact\r\nFactObservationContext\r\nSystemFactHub\r\n\u0060\u0060\u0060\r\n\r\n## \u4F7F\u7528\u6982\u5FF5\r\n\r\n\u0060\u0060\u0060text\r\nDamageApplied\r\n    \u2193\r\nSystemFactHub\r\n    \u251C\u2500\u2500 LogObserver\r\n    \u251C\u2500\u2500 MetricsObserver\r\n    \u2514\u2500\u2500 DebugOverlayObserver\r\n\u0060\u0060\u0060\r\n\r\nProducer \u4E0D\u9700\u8981\u77E5\u9053\u6709\u54EA\u4E9B Observer\u3002\r\n\r\nObserver \u7684\u52A0\u5165\u6216\u79FB\u9664\u4E5F\u4E0D\u61C9\u8981\u6C42\u4FEE\u6539 Domain \u6216 Application \u908F\u8F2F\u3002\r\n\r\n## Observation Context\r\n\r\nFact \u672C\u8EAB\u53EA\u63CF\u8FF0\u300C\u767C\u751F\u4E86\u4EC0\u9EBC\u300D\u3002\r\n\r\n\u89C0\u5BDF\u76F8\u95DC\u8CC7\u8A0A\u7531\u672C Module \u984D\u5916\u63D0\u4F9B\uFF0C\u4F8B\u5982\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\nPublish Sequence\r\nTimestamp\r\n\u0060\u0060\u0060\r\n\r\n\u0060FactObservationContext\u0060 \u53EA\u4FDD\u7559\u5DF2\u6709\u7A69\u5B9A\u8A9E\u610F\u7684\u6B04\u4F4D\u3002\u6BCF\u6B21\u5408\u6CD5 \u0060Publish\u0060 \u90FD\u914D\u7F6E sequence\uFF0C\u5373\u4F7F\u6C92\u6709 observer\u3002\u0060SystemFactHubBuilder\u0060 \u5728 composition \u6642\u8A3B\u518A assignable/interface routes\uFF0C\u0060Build\u0060 \u5F8C topology immutable\u3002\r\n\r\n\u0060Publish(null)\u0060 \u56FA\u5B9A\u62CB\u51FA \u0060ArgumentNullException\u0060\u3002Observer failure \u4E0D\u5F71\u97FF\u4E3B\u6D41\u7A0B\uFF0C\u4E26\u900F\u904E \u0060IObservationFailureSink\u0060 \u56DE\u5831\u3002\r\n\r\nRouting \u4F7F\u7528 assignable semantics\uFF0C\u56E0\u6B64 concrete\u3001category interface \u8207 \u0060ISystemFact\u0060 observers \u6703\u6536\u5230\u540C\u4E00\u500B fact \u8207 sequence\u3002\u6B64 public contract \u5DF2 freeze\u3002\r\n\r\n## \u4E0D\u8CA0\u8CAC\r\n\r\n\u672C Module \u4E0D\u8CA0\u8CAC\uFF1A\r\n\r\n\u0060\u0060\u0060text\r\n\u5177\u9AD4 Domain Fact \u5B9A\u7FA9\r\nDomain Event Bus\r\nLogging \u5BE6\u4F5C\r\nMetrics Backend\r\nTracing Backend\r\nReplay\r\nPersistence\r\nUnity Integration\r\n\u0060\u0060\u0060\r\n\r\n\u5177\u9AD4\u8F38\u51FA\u61C9\u7531\u5916\u90E8 Observer \u6216 Integration Module \u5BE6\u4F5C\u3002\r\n\r\n## \u6838\u5FC3\u539F\u5247\r\n\r\n\u003E System Fact \u63CF\u8FF0\u4E8B\u5BE6\uFF1BObservability \u6C7A\u5B9A\u5982\u4F55\u89C0\u5BDF\u9019\u4E9B\u4E8B\u5BE6\u3002\r\n\r\n\u0060Module.Verification.SystemFact.Observability\u0060 \u4E0D\u61C9\u6539\u8B8A\u696D\u52D9\u6D41\u7A0B\uFF0C\u4E5F\u4E0D\u61C9\u8B93 Observer failure \u5F71\u97FF\u4E3B\u8981\u7CFB\u7D71\u57F7\u884C\u3002\r\n","truncated":false}},{"id":"Module.Verification.TraceBuffer","kind":"Module","isAvailable":true,"isRepositoryRoot":false,"readme":{"path":"README.md","content":"# module.verification.trace-buffer\r\n\r\n\u7D14 C#\u3001\u4E0D\u4F9D\u8CF4 Unity\uFF0Fsimulation\uFF0F\u5176\u4ED6 verification capability \u7684 generic temporal storage\u3002\r\n\u0060src/API\u0060 \u70BA\u8B80\u5BEB ports\u3001\u0060src/Contract\u0060 \u70BA cursor\uFF0Fread state\u3001\u0060src/Runtime\u0060 \u70BA buffer\uFF0C\u6E2C\u8A66\u5728 \u0060tests\u0060\u3002\r\n\r\n\u0060\u0060\u0060csharp\r\nITraceBuffer\u003Cstring\u003E buffer = new TraceBuffer\u003Cstring\u003E(512);\r\nITraceWriter\u003Cstring\u003E writer = buffer.Writer;\r\nITraceReader\u003Cstring\u003E reader = buffer.Reader;\r\nwriter.Append(\u0022started\u0022);\r\nTraceRead\u003Cstring\u003E page = reader.Read(default, 64);\r\nTraceCursor cursor = page.NextCursor;\r\nTraceRead\u003Cstring\u003E next = reader.Read(cursor, 64);\r\n\u0060\u0060\u0060\r\n\r\n## API\uFF0FContract\r\n\r\n- \u0060ITraceBuffer\u003CT\u003E\u0060 \u63D0\u4F9B append\u3001ordered read\u3001cursor\u3001pagination\u3001eviction \u7684 bounded storage contract\uFF1Bowner \u4E5F\u53EF\u5206\u5225\u4EA4\u4ED8 Writer\uFF0FReader facade\u3002\r\n- \u7D00\u9304 Sequence \u5F9E 1 \u905E\u589E\uFF0C\u662F journal \u4F4D\u7F6E\uFF0C\u4E0D\u662F\u904A\u6232 Action sequence\u3001tick \u6216 wall clock\u3002\r\n- Cursor = StreamId \u002B AfterSequence\uFF0C\u63A1 exclusive \u8A9E\u610F\u3002default \u8868\u793A\u5F9E\u76EE\u524D\u4FDD\u7559\u7684\u6700\u65E9\u7D00\u9304\u8B80\u8D77\u3002\r\n- Read \u4E0D\u6D88\u8017\u4F86\u6E90\u3001\u4E0D\u66F4\u52D5\u5176\u4ED6 reader\u3002\u591A\u500B\u5DE5\u5177\u5404\u81EA\u6301\u6709 cursor\u3002\r\n- \u540C stream \u7684\u672A\u4F86 cursor\uFF0F\u975E\u6B63\u6578 maxItems \u88AB\u62D2\u7D55\uFF1B\u8B80\u53D6\u91CF\u6700\u591A\u70BA\u4F86\u6E90\u5BB9\u91CF\u3002\r\n- MissedCount \u662F\u9019\u6B21 cursor \u5C1A\u672A\u8B80\u5230\u4F46\u5DF2\u88AB\u8986\u84CB\u7684\u7B46\u6578\uFF1B\u4F7F\u7528 NextCursor \u4E0D\u6703\u91CD\u8907\u8A08\u5165\u3002\r\n- OverwrittenCount \u662F\u4F86\u6E90\u81EA\u5EFA\u7ACB\u4EE5\u4F86\u7D2F\u8A08\u88AB\u8986\u84CB\u7B46\u6578\uFF0C\u4E0D\u7B49\u65BC\u67D0\u500B reader \u907A\u5931\u7B46\u6578\u3002\r\n- \u0060TraceReadState.ForeignCursor\u0060 \u8868\u793A cursor \u5C6C\u65BC\u53E6\u4E00\u500B stream\u3002\u56DE\u50B3\u65B0 stream \u6700\u65E9\u4FDD\u7559\u8CC7\u6599\uFF0Cconsumer \u5FC5\u9808\u6E05\u9664\u820A stream \u7684 local history\u3002\r\n- Foreign cursor \u7121\u6CD5\u91CF\u5316\u820A stream \u6700\u5F8C\u5C1A\u672A\u8B80\u53D6\u7684\u8CC7\u6599\uFF1B\u6B64\u6642 MissedCount \u50C5\u63CF\u8FF0\u65B0 stream \u5DF2\u88AB\u8986\u84CB\u7684\u524D\u7DB4\u3002\r\n- HasMore \u8868\u793A\u9084\u6709\u672A\u8B80\u7684\u4FDD\u7559\u7D00\u9304\uFF1BNextCursor \u662F\u672C\u9801\u6700\u5F8C\u5DF2\u8B80\u4F4D\u7F6E\u3002\r\n- Sequence \u8017\u76E1\u660E\u78BA\u5931\u6557\uFF0C\u4E0D wrap\uFF1B\u65B0 buffer \u7522\u751F\u65B0 stream identity\uFF0C\u6C92\u6709\u8DE8 stream \u91CD\u7528\u5E8F\u865F\u7684\u6DF7\u6DC6\u3002\r\n- Read \u64C1\u6709\u81EA\u5DF1\u7684\u552F\u8B80 payload \u9663\u5217\uFF0C\u4F46\u4E0D\u6DF1\u62F7\u8C9D T\u3002T \u5FC5\u9808\u70BA\u4E0D\u53EF\u8B8A payload\u3002\r\n- \u55AE\u57F7\u884C\u7DD2\uFF1B\u672A\u63D0\u4F9B thread safety\u3001\u6301\u4E45\u5316\u6216 transport\u3002\u5BB9\u91CF\u9650\u5236\u7684\u662F\u7B46\u6578\uFF0C\u4E0D\u662F\u4EFB\u610F payload \u7684 byte \u6578\u3002\r\n\r\nSimulation \u7684 Session\uFF0FTick\uFF0FWave\uFF0FActor \u6B04\u4F4D\u7531 adopter \u5B9A\u7FA9\u5728\u81EA\u5DF1\u7684 payload\uFF1B\u672C module \u4E0D\u89E3\u91CB\u5B83\u5011\uFF0C\u4E5F\u4E0D\u77E5\u9053 facts\u3001operations\u3001diagnostics\u3001oracles\u3001invariants or evidence\u3002\u6B64 public contract \u5DF2 freeze\u3002\r\n","truncated":false}},{"id":"Workspace.Verification","kind":"Workspace","isAvailable":true,"isRepositoryRoot":true,"readme":null}],"edges":[{"source":"Module.Verification.SystemFact.Observability","target":"Module.Verification.SystemFact","relations":["DependsOn"],"evidence":[{"kind":"assembly-reference","sourcePath":"Module.Verification.SystemFact.Observability.asmdef","detail":"references \u0022Module.Verification.SystemFact\u0022","line":null},{"kind":"project-reference","sourcePath":"Module.Verification.SystemFact.Observability.csproj","detail":"ProjectReference Include=\u0022../Module.Verification.SystemFact/src/Module.Verification.SystemFact.csproj\u0022","line":13}]},{"source":"Module.Verification.SystemFact.Observability","target":"Workspace.Verification","relations":["DependsOn"],"evidence":[{"kind":"source-include","sourcePath":"Module.Verification.SystemFact.Observability.csproj","detail":"Compile Include=\u0022src/**/*.cs\u0022","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.Diagnostics","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.Diagnostics","detail":"owned logical unit \u0027Module.Verification.Diagnostics\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.Evidence","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.Evidence","detail":"owned logical unit \u0027Module.Verification.Evidence\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.Invariant","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.Invariant","detail":"owned logical unit \u0027Module.Verification.Invariant\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.Oracle","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.Oracle","detail":"owned logical unit \u0027Module.Verification.Oracle\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.RuntimeControl","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.RuntimeControl","detail":"owned logical unit \u0027Module.Verification.RuntimeControl\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.StateSnapshot","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.StateSnapshot","detail":"owned logical unit \u0027Module.Verification.StateSnapshot\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.SystemFact","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.SystemFact","detail":"owned logical unit \u0027Module.Verification.SystemFact\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.SystemFact.Observability","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.SystemFact.Observability","detail":"owned logical unit \u0027Module.Verification.SystemFact.Observability\u0027","line":null}]},{"source":"Workspace.Verification","target":"Module.Verification.TraceBuffer","relations":["Contains"],"evidence":[{"kind":"ownership","sourcePath":"Module.Verification.TraceBuffer","detail":"owned logical unit \u0027Module.Verification.TraceBuffer\u0027","line":null}]}],"findings":[{"ruleId":"WSP-001","severity":"Error","message":"Workspace is a source/version container, not an architectural dependency unit: Module.Verification.SystemFact.Observability -\u003E Workspace.Verification.","sourceId":"Module.Verification.SystemFact.Observability","targetId":"Workspace.Verification"}],"rules":[{"id":"FRM-003","description":"Framework must not depend on a concrete product Project."},{"id":"FRM-008","description":"Framework-to-Framework dependencies must be explicit, one-way, and cycle-free."},{"id":"IDN-001","description":"Architectural identity uses PascalCase dot-separated hierarchy with Kind as the first segment."},{"id":"MOD-003","description":"Module dependencies must remain explicit, one-way, and cycle-free."},{"id":"MOD-004","description":"Module must not depend on Framework or concrete Project."},{"id":"WSP-001","description":"Workspace is a source/version container, not an architectural dependency unit."}]}
+  </script>
+  <script>
+    (() => {
+      const viewport = document.getElementById("graph-viewport");
+      const zoomSurface = document.getElementById("zoom-surface");
+      const canvas = document.getElementById("graph-canvas");
+      const zoomStatus = document.getElementById("zoom-status");
+      const autoScrollIndicator =
+        document.getElementById("autoscroll-indicator");
+      const graphSvg =
+        document.getElementById("graph-svg");
+      const layerBands =
+        [...document.querySelectorAll(".layer-band")];
+      const layerLabels =
+        [...document.querySelectorAll(".layer-label")];
+      const inspector =
+        document.getElementById("graph-inspector");
+      const inspectorTitle =
+        document.getElementById("inspector-title");
+      const inspectorBody =
+        document.getElementById("inspector-body");
+      const inspectorClose =
+        document.getElementById("inspector-close");
+      const architectureSummary =
+        document.getElementById("architecture-summary");
+      const inspectorData =
+        JSON.parse(
+          document.getElementById("graph-inspector-data").textContent);
+
+      const inspectorNodes = new Map(
+        inspectorData.nodes.map(node => [node.id, node]));
+
+      const inspectorEdges = inspectorData.edges;
+      const architectureFindings = inspectorData.findings;
+      const architectureRules = inspectorData.rules;
+
+      const nodeElements = new Map(
+        [...document.querySelectorAll(".node")]
+          .map(element => [element.dataset.node, element])
+      );
+
+      const edgeElements = [...document.querySelectorAll(".edge")]
+        .map(element => ({
+          element,
+          source: element.dataset.source,
+          target: element.dataset.target
+        }));
+
+      const ownershipGroups =
+        [...document.querySelectorAll(".ownership-group")];
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function evidenceHtml(edge, direction) {
+        const counterpart =
+          direction === "incoming"
+            ? edge.source
+            : edge.target;
+
+        const arrow =
+          direction === "incoming"
+            ? counterpart + " → " + edge.target
+            : edge.source + " → " + counterpart;
+
+        const evidence =
+          edge.evidence.length === 0
+            ? '<li class="empty-state">No source evidence captured.</li>'
+            : edge.evidence.map(item => {
+                const line =
+                  item.line == null
+                    ? ""
+                    : ":" + item.line;
+
+                return "<li><strong>"
+                  + escapeHtml(item.kind)
+                  + "</strong> <code>"
+                  + escapeHtml(item.sourcePath)
+                  + escapeHtml(line)
+                  + "</code><br>"
+                  + escapeHtml(item.detail)
+                  + "</li>";
+              }).join("");
+
+        return '<details class="evidence-edge"><summary>'
+          + escapeHtml(arrow)
+          + ' <span class="inspector-meta">['
+          + escapeHtml(edge.relations.join(", "))
+          + ']</span></summary><ul class="evidence-list">'
+          + evidence
+          + "</ul></details>";
+      }
+
+      function findingHtml(finding) {
+        return '<div class="finding '
+          + escapeHtml(finding.severity.toLowerCase())
+          + '"><span class="finding-rule">'
+          + escapeHtml(finding.ruleId)
+          + "</span>"
+          + escapeHtml(finding.message)
+          + "</div>";
+      }
+
+      function showNodeInspector(nodeId) {
+        const node = inspectorNodes.get(nodeId);
+        if (!node) {
+          return;
+        }
+
+        const incoming = inspectorEdges
+          .filter(edge => edge.target === nodeId);
+
+        const outgoing = inspectorEdges
+          .filter(edge => edge.source === nodeId);
+
+        const findings = architectureFindings
+          .filter(finding =>
+            finding.sourceId === nodeId
+            || finding.targetId === nodeId);
+
+        inspectorTitle.textContent = nodeId;
+
+        const readmeHtml =
+          node.readme == null
+            ? '<div class="empty-state">No README.md found at this component root.</div>'
+            : '<div class="inspector-meta">'
+              + escapeHtml(node.readme.path)
+              + (node.readme.truncated ? " · truncated" : "")
+              + '</div><pre class="readme">'
+              + escapeHtml(node.readme.content)
+              + "</pre>";
+
+        inspectorBody.innerHTML =
+          '<section class="inspector-section"><h3>Component</h3>'
+          + '<div><strong>' + escapeHtml(node.kind) + '</strong></div>'
+          + '<div class="inspector-meta">'
+          + (node.isRepositoryRoot ? "physical repository" : "logical unit")
+          + (node.isAvailable ? " · available" : " · not checked out")
+          + '</div></section>'
+          + '<section class="inspector-section"><h3>Why / Incoming</h3>'
+          + (incoming.length === 0
+              ? '<div class="empty-state">No incoming dependency evidence.</div>'
+              : incoming.map(edge => evidenceHtml(edge, "incoming")).join(""))
+          + '</section>'
+          + '<section class="inspector-section"><h3>Outgoing dependencies</h3>'
+          + (outgoing.length === 0
+              ? '<div class="empty-state">No outgoing dependency evidence.</div>'
+              : outgoing.map(edge => evidenceHtml(edge, "outgoing")).join(""))
+          + '</section>'
+          + '<section class="inspector-section"><h3>Architecture findings</h3>'
+          + (findings.length === 0
+              ? '<div class="empty-state">No finding for this component.</div>'
+              : findings.map(findingHtml).join(""))
+          + '</section>'
+          + '<section class="inspector-section"><h3>README</h3>'
+          + readmeHtml
+          + '</section>';
+
+        inspector.classList.add("open");
+      }
+
+      function showArchitectureInspector() {
+        inspectorTitle.textContent = "Architecture validation";
+
+        const findingsHtml =
+          architectureFindings.length === 0
+            ? '<div class="empty-state">No statically detectable violation.</div>'
+            : architectureFindings.map(findingHtml).join("");
+
+        const rulesHtml =
+          '<ul class="rule-list">'
+          + architectureRules.map(rule =>
+              '<li><strong>' + escapeHtml(rule.id) + '</strong> '
+              + escapeHtml(rule.description) + '</li>')
+            .join("")
+          + "</ul>";
+
+        inspectorBody.innerHTML =
+          '<section class="inspector-section"><h3>Findings</h3>'
+          + findingsHtml
+          + '</section><section class="inspector-section"><h3>Enforced rules</h3>'
+          + rulesHtml
+          + '</section><section class="inspector-section"><h3>Scope</h3>'
+          + '<div class="inspector-meta">Only rules that can be decided from static repository/assembly dependency evidence are enforced. Semantic necessity remains a review concern.</div>'
+          + "</section>";
+
+        inspector.classList.add("open");
+      }
+
+      const errorCount =
+        architectureFindings.filter(
+          finding => finding.severity === "Error").length;
+
+      const warningCount =
+        architectureFindings.filter(
+          finding => finding.severity === "Warning").length;
+
+      architectureSummary.textContent =
+        "Architecture · "
+        + errorCount + "E / "
+        + warningCount + "W";
+
+      architectureSummary.classList.toggle(
+        "has-findings",
+        architectureFindings.length > 0);
+
+      architectureSummary.addEventListener(
+        "click",
+        showArchitectureInspector);
+
+      inspectorClose.addEventListener(
+        "click",
+        () => inspector.classList.remove("open"));
+
+      const displayModeButtons =
+        [...document.querySelectorAll(".display-mode")];
+
+      let displayMode = "all";
+
+      const layoutMetrics = {
+        minimumWidth: 960,
+        nodeHeight: 84,
+        horizontalGap: 56,
+        ownershipGroupGap: 38,
+        ownershipPadding: 18,
+        verticalGap: 116,
+        leftMargin: 150,
+        topMargin: 106,
+        rightMargin: 80,
+        bottomMargin: 72
+      };
+
+      let layoutWidth =
+        Number(canvas.dataset.baseWidth);
+
+      let layoutHeight =
+        Number(canvas.dataset.baseHeight);
+
+      function numericStyle(element, propertyName) {
+        return Number.parseFloat(
+          element.style[propertyName] || "0");
+      }
+
+      function isOwnershipBoundary(left, right) {
+        const leftOwner = left.dataset.owner || "";
+        const rightOwner = right.dataset.owner || "";
+
+        if (!leftOwner && !rightOwner) {
+          return false;
+        }
+
+        return leftOwner !== rightOwner;
+      }
+
+      function rowWidth(nodes) {
+        if (nodes.length === 0) {
+          return 0;
+        }
+
+        let width = 0;
+
+        for (let index = 0; index < nodes.length; index++) {
+          width += numericStyle(nodes[index], "width");
+
+          if (index === 0) {
+            continue;
+          }
+
+          width += layoutMetrics.horizontalGap;
+
+          if (isOwnershipBoundary(
+              nodes[index - 1],
+              nodes[index])) {
+            width += layoutMetrics.ownershipGroupGap;
+          }
+        }
+
+        return width;
+      }
+
+      function setEdgePath(edge) {
+        const source =
+          nodeElements.get(edge.source);
+
+        const target =
+          nodeElements.get(edge.target);
+
+        if (!source || !target) {
+          return;
+        }
+
+        const sourceX =
+          numericStyle(source, "left");
+
+        const sourceY =
+          numericStyle(source, "top");
+
+        const sourceWidth =
+          numericStyle(source, "width");
+
+        const targetX =
+          numericStyle(target, "left");
+
+        const targetY =
+          numericStyle(target, "top");
+
+        const targetWidth =
+          numericStyle(target, "width");
+
+        let startX =
+          sourceX + sourceWidth / 2;
+
+        let startY =
+          sourceY + layoutMetrics.nodeHeight;
+
+        let endX =
+          targetX + targetWidth / 2;
+
+        let endY = targetY;
+
+        if (endY <= startY) {
+          startX = sourceX + sourceWidth;
+          startY =
+            sourceY + layoutMetrics.nodeHeight / 2;
+          endX = targetX;
+          endY =
+            targetY + layoutMetrics.nodeHeight / 2;
+        }
+
+        const middleY =
+          (startY + endY) / 2;
+
+        edge.element.setAttribute(
+          "d",
+          "M " + startX + " " + startY
+          + " C " + startX + " " + middleY
+          + ", " + endX + " " + middleY
+          + ", " + endX + " " + endY);
+      }
+
+      function relayoutVisibleGraph() {
+        const visibleNodes =
+          [...nodeElements.values()]
+            .filter(element =>
+              !element.classList.contains("mode-hidden"));
+
+        const nodesByOriginalLayer = new Map();
+
+        for (const element of visibleNodes) {
+          const originalLayer =
+            Number(element.dataset.layer);
+
+          if (!nodesByOriginalLayer.has(originalLayer)) {
+            nodesByOriginalLayer.set(
+              originalLayer,
+              []);
+          }
+
+          nodesByOriginalLayer
+            .get(originalLayer)
+            .push(element);
+        }
+
+        const visibleLayers =
+          [...nodesByOriginalLayer.keys()]
+            .sort((left, right) => left - right);
+
+        for (const nodes of nodesByOriginalLayer.values()) {
+          nodes.sort(
+            (left, right) =>
+              Number(left.dataset.order)
+              - Number(right.dataset.order));
+        }
+
+        const maxRowWidth =
+          visibleLayers.length === 0
+            ? 0
+            : Math.max(
+                ...visibleLayers.map(layer =>
+                  rowWidth(
+                    nodesByOriginalLayer.get(layer))));
+
+        layoutWidth = Math.max(
+          layoutMetrics.minimumWidth,
+          layoutMetrics.leftMargin
+            + maxRowWidth
+            + layoutMetrics.rightMargin);
+
+        const maxDenseLayer =
+          Math.max(0, visibleLayers.length - 1);
+
+        layoutHeight =
+          layoutMetrics.topMargin
+          + ((maxDenseLayer + 1)
+            * layoutMetrics.nodeHeight)
+          + (maxDenseLayer
+            * layoutMetrics.verticalGap)
+          + layoutMetrics.bottomMargin;
+
+        const denseLayerByOriginal = new Map();
+
+        visibleLayers.forEach(
+          (originalLayer, denseLayer) => {
+            denseLayerByOriginal.set(
+              originalLayer,
+              denseLayer);
+
+            const nodes =
+              nodesByOriginalLayer.get(originalLayer);
+
+            const width = rowWidth(nodes);
+
+            let x =
+              layoutMetrics.leftMargin
+              + Math.max(
+                  0,
+                  ((layoutWidth
+                    - layoutMetrics.leftMargin
+                    - layoutMetrics.rightMargin)
+                    - width) / 2);
+
+            const y =
+              layoutMetrics.topMargin
+              + denseLayer
+                * (layoutMetrics.nodeHeight
+                  + layoutMetrics.verticalGap);
+
+            for (let index = 0; index < nodes.length; index++) {
+              const element = nodes[index];
+
+              if (index > 0) {
+                const previous = nodes[index - 1];
+
+                x +=
+                  numericStyle(previous, "width")
+                  + layoutMetrics.horizontalGap;
+
+                if (isOwnershipBoundary(
+                    previous,
+                    element)) {
+                  x +=
+                    layoutMetrics.ownershipGroupGap;
+                }
+              }
+
+              element.style.left = x + "px";
+              element.style.top = y + "px";
+              element.dataset.currentLayer =
+                String(denseLayer);
+            }
+          });
+
+        for (const band of layerBands) {
+          const originalLayer =
+            Number(band.dataset.layer);
+
+          const denseLayer =
+            denseLayerByOriginal.get(originalLayer);
+
+          const label =
+            layerLabels.find(candidate =>
+              Number(candidate.dataset.layer)
+              === originalLayer);
+
+          if (denseLayer === undefined) {
+            band.classList.add("mode-hidden");
+            label?.classList.add("mode-hidden");
+            continue;
+          }
+
+          band.classList.remove("mode-hidden");
+          label?.classList.remove("mode-hidden");
+
+          const y =
+            layoutMetrics.topMargin
+            + denseLayer
+              * (layoutMetrics.nodeHeight
+                + layoutMetrics.verticalGap);
+
+          const bandTop =
+            Math.max(
+              0,
+              y - layoutMetrics.verticalGap / 2);
+
+          band.style.top =
+            bandTop + "px";
+
+          if (label) {
+            label.style.top =
+              (y
+                + layoutMetrics.nodeHeight / 2
+                - 8) + "px";
+
+            label.textContent =
+              "Layer " + denseLayer;
+          }
+        }
+
+        for (const group of ownershipGroups) {
+          const ownerId =
+            group.dataset.owner;
+
+          const originalLayer =
+            Number(group.dataset.layer);
+
+          const children =
+            visibleNodes.filter(element =>
+              element.dataset.owner === ownerId
+              && Number(element.dataset.layer)
+                === originalLayer);
+
+          if (children.length === 0) {
+            group.classList.add("mode-hidden");
+            continue;
+          }
+
+          group.classList.remove("mode-hidden");
+
+          const minX = Math.min(
+            ...children.map(element =>
+              numericStyle(element, "left")));
+
+          const maxRight = Math.max(
+            ...children.map(element =>
+              numericStyle(element, "left")
+              + numericStyle(element, "width")));
+
+          const y =
+            numericStyle(children[0], "top");
+
+          group.style.left =
+            (minX
+              - layoutMetrics.ownershipPadding)
+            + "px";
+
+          group.style.top =
+            (y - 34) + "px";
+
+          group.style.width =
+            ((maxRight - minX)
+              + layoutMetrics.ownershipPadding * 2)
+            + "px";
+
+          group.style.height =
+            (layoutMetrics.nodeHeight + 56)
+            + "px";
+        }
+
+        for (const edge of edgeElements) {
+          const sourceHidden =
+            nodeElements.get(edge.source)
+              ?.classList.contains("mode-hidden")
+              ?? true;
+
+          const targetHidden =
+            nodeElements.get(edge.target)
+              ?.classList.contains("mode-hidden")
+              ?? true;
+
+          edge.element.classList.toggle(
+            "mode-hidden",
+            sourceHidden || targetHidden);
+
+          if (!sourceHidden && !targetHidden) {
+            setEdgePath(edge);
+          }
+        }
+
+        canvas.style.width =
+          layoutWidth + "px";
+
+        canvas.style.height =
+          layoutHeight + "px";
+
+        graphSvg.setAttribute(
+          "width",
+          String(layoutWidth));
+
+        graphSvg.setAttribute(
+          "height",
+          String(layoutHeight));
+
+        graphSvg.setAttribute(
+          "viewBox",
+          "0 0 "
+            + layoutWidth
+            + " "
+            + layoutHeight);
+      }
+
+      function applyDisplayMode() {
+        const referencedOnly =
+          displayMode === "referenced";
+
+        for (const element of nodeElements.values()) {
+          element.classList.toggle(
+            "mode-hidden",
+            referencedOnly
+              && element.classList.contains("root-detached"));
+        }
+
+        relayoutVisibleGraph();
+
+        if (selectedNodeId) {
+          const selectedElement =
+            nodeElements.get(selectedNodeId);
+
+          if (selectedElement?.classList.contains("mode-hidden")) {
+            selectedNodeId = null;
+            selectionMode = null;
+          }
+        }
+
+        if (hoveredNodeId) {
+          const hoveredElement =
+            nodeElements.get(hoveredNodeId);
+
+          if (hoveredElement?.classList.contains("mode-hidden")) {
+            hoveredNodeId = null;
+          }
+        }
+
+        refreshVisuals();
+        applyZoom(zoom);
+      }
+
+      for (const button of displayModeButtons) {
+        button.addEventListener(
+          "click",
+          () => {
+            displayMode =
+              button.dataset.displayMode ?? "all";
+
+            for (const candidate of displayModeButtons) {
+              candidate.classList.toggle(
+                "active",
+                candidate === button);
+            }
+
+            applyDisplayMode();
+          });
+      }
+
+      const outgoing = new Map();
+      const incoming = new Map();
+
+      for (const edge of edgeElements) {
+        if (!outgoing.has(edge.source)) {
+          outgoing.set(edge.source, []);
+        }
+        outgoing.get(edge.source).push(edge);
+
+        if (!incoming.has(edge.target)) {
+          incoming.set(edge.target, []);
+        }
+        incoming.get(edge.target).push(edge);
+      }
+
+      let selectedNodeId = null;
+      let selectionMode = null;
+      let hoveredNodeId = null;
+
+      function collectChain(startNodeId, mode) {
+        const activeNodes = new Set([startNodeId]);
+        const activeEdges = new Set();
+        const pending = [startNodeId];
+        const adjacency = mode === "incoming" ? incoming : outgoing;
+
+        while (pending.length > 0) {
+          const currentNodeId = pending.shift();
+
+          for (const edge of adjacency.get(currentNodeId) ?? []) {
+            activeEdges.add(edge.element);
+
+            const nextNodeId =
+              mode === "incoming"
+                ? edge.source
+                : edge.target;
+
+            if (activeNodes.add(nextNodeId)) {
+              pending.push(nextNodeId);
+            }
+          }
+        }
+
+        return { activeNodes, activeEdges };
+      }
+
+      function resetVisualClasses() {
+        for (const element of nodeElements.values()) {
+          element.classList.remove(
+            "selected",
+            "dependency",
+            "dimmed",
+            "hover-source",
+            "hover-related");
+        }
+
+        for (const edge of edgeElements) {
+          edge.element.classList.remove(
+            "highlighted",
+            "hovered",
+            "dimmed");
+        }
+      }
+
+      function applyHover() {
+        if (!hoveredNodeId || selectedNodeId) {
+          return;
+        }
+
+        const relatedNodes = new Set([hoveredNodeId]);
+        const relatedEdges = [];
+
+        for (const edge of outgoing.get(hoveredNodeId) ?? []) {
+          relatedNodes.add(edge.target);
+          relatedEdges.push(edge);
+        }
+
+        for (const edge of incoming.get(hoveredNodeId) ?? []) {
+          relatedNodes.add(edge.source);
+          relatedEdges.push(edge);
+        }
+
+        const hoveredElement = nodeElements.get(hoveredNodeId);
+        if (hoveredElement) {
+          hoveredElement.classList.add("hover-source");
+        }
+
+        for (const nodeId of relatedNodes) {
+          if (nodeId === hoveredNodeId) continue;
+          nodeElements.get(nodeId)?.classList.add("hover-related");
+        }
+
+        for (const edge of relatedEdges) {
+          edge.element.classList.add("hovered");
+        }
+      }
+
+      function refreshVisuals() {
+        resetVisualClasses();
+
+        if (!selectedNodeId || !selectionMode) {
+          applyHover();
+          return;
+        }
+
+        const { activeNodes, activeEdges } =
+          collectChain(selectedNodeId, selectionMode);
+
+        for (const [nodeId, element] of nodeElements) {
+          element.classList.toggle(
+            "selected",
+            nodeId === selectedNodeId);
+
+          element.classList.toggle(
+            "dependency",
+            nodeId !== selectedNodeId && activeNodes.has(nodeId));
+
+          element.classList.toggle(
+            "dimmed",
+            !activeNodes.has(nodeId));
+        }
+
+        for (const edge of edgeElements) {
+          const highlighted = activeEdges.has(edge.element);
+          edge.element.classList.toggle("highlighted", highlighted);
+          edge.element.classList.toggle("dimmed", !highlighted);
+        }
+      }
+
+      function toggleSelection(nodeId, mode) {
+        if (selectedNodeId === nodeId && selectionMode === mode) {
+          selectedNodeId = null;
+          selectionMode = null;
+        } else {
+          selectedNodeId = nodeId;
+          selectionMode = mode;
+        }
+
+        refreshVisuals();
+      }
+
+      for (const [nodeId, element] of nodeElements) {
+        element.addEventListener(
+          "mouseenter",
+          () => {
+            hoveredNodeId = nodeId;
+            if (!selectedNodeId) {
+              refreshVisuals();
+            }
+          });
+
+        element.addEventListener(
+          "mouseleave",
+          () => {
+            if (hoveredNodeId === nodeId) {
+              hoveredNodeId = null;
+            }
+            if (!selectedNodeId) {
+              refreshVisuals();
+            }
+          });
+
+        element.addEventListener(
+          "click",
+          () => {
+            toggleSelection(nodeId, "outgoing");
+            showNodeInspector(nodeId);
+          });
+
+        element.addEventListener(
+          "contextmenu",
+          event => {
+            event.preventDefault();
+            toggleSelection(nodeId, "incoming");
+            showNodeInspector(nodeId);
+          });
+
+        element.addEventListener(
+          "keydown",
+          event => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggleSelection(nodeId, "outgoing");
+            }
+          });
+      }
+
+      window.addEventListener(
+        "keydown",
+        event => {
+          if (event.key !== "Escape") {
+            return;
+          }
+
+          if (selectedNodeId) {
+            selectedNodeId = null;
+            selectionMode = null;
+            refreshVisuals();
+          }
+
+          stopAutoScroll();
+        });
+
+      const minZoom = 0.25;
+      const maxZoom = 3;
+      const zoomStep = 1.12;
+      let zoom = 1;
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function applyZoom(nextZoom) {
+        zoom = clamp(nextZoom, minZoom, maxZoom);
+        canvas.style.transform = "scale(" + zoom + ")";
+        zoomSurface.style.width =
+          (layoutWidth * zoom) + "px";
+        zoomSurface.style.height =
+          (layoutHeight * zoom) + "px";
+        zoomStatus.textContent = Math.round(zoom * 100) + "%";
+      }
+
+      viewport.addEventListener(
+        "wheel",
+        event => {
+          event.preventDefault();
+
+          const viewportRect = viewport.getBoundingClientRect();
+          const pointerX = event.clientX - viewportRect.left;
+          const pointerY = event.clientY - viewportRect.top;
+
+          const worldX =
+            (viewport.scrollLeft + pointerX) / zoom;
+
+          const worldY =
+            (viewport.scrollTop + pointerY) / zoom;
+
+          const direction =
+            event.deltaY < 0
+              ? zoomStep
+              : 1 / zoomStep;
+
+          const nextZoom =
+            clamp(zoom * direction, minZoom, maxZoom);
+
+          if (nextZoom === zoom) {
+            return;
+          }
+
+          applyZoom(nextZoom);
+
+          viewport.scrollLeft =
+            worldX * zoom - pointerX;
+
+          viewport.scrollTop =
+            worldY * zoom - pointerY;
+        },
+        { passive: false });
+
+      let isLeftPanning = false;
+      let leftPointerId = null;
+      let leftPanStartX = 0;
+      let leftPanStartY = 0;
+      let leftPanStartScrollLeft = 0;
+      let leftPanStartScrollTop = 0;
+
+      let autoScrollActive = false;
+      let autoScrollOriginX = 0;
+      let autoScrollOriginY = 0;
+      let autoScrollPointerX = 0;
+      let autoScrollPointerY = 0;
+      let autoScrollFrame = null;
+
+      function beginLeftPan(event) {
+        if (event.button !== 0) {
+          return;
+        }
+
+        stopAutoScroll();
+
+        if (event.target.closest(".node")) {
+          return;
+        }
+
+        event.preventDefault();
+
+        isLeftPanning = true;
+        leftPointerId = event.pointerId;
+        leftPanStartX = event.clientX;
+        leftPanStartY = event.clientY;
+        leftPanStartScrollLeft = viewport.scrollLeft;
+        leftPanStartScrollTop = viewport.scrollTop;
+
+        viewport.classList.add("panning");
+        viewport.setPointerCapture(event.pointerId);
+      }
+
+      function updateLeftPan(event) {
+        if (!isLeftPanning
+            || event.pointerId !== leftPointerId)
+        {
+          return;
+        }
+
+        event.preventDefault();
+
+        viewport.scrollLeft =
+          leftPanStartScrollLeft
+          - (event.clientX - leftPanStartX);
+
+        viewport.scrollTop =
+          leftPanStartScrollTop
+          - (event.clientY - leftPanStartY);
+      }
+
+      function endLeftPan(event) {
+        if (!isLeftPanning
+            || event.pointerId !== leftPointerId)
+        {
+          return;
+        }
+
+        isLeftPanning = false;
+        leftPointerId = null;
+        viewport.classList.remove("panning");
+
+        if (viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      function autoScrollVelocity(delta) {
+        const deadZone = 18;
+        const magnitude = Math.abs(delta);
+
+        if (magnitude <= deadZone) {
+          return 0;
+        }
+
+        const signed =
+          Math.sign(delta)
+          * Math.min(34, (magnitude - deadZone) * 0.16);
+
+        return signed;
+      }
+
+      function autoScrollTick() {
+        if (!autoScrollActive) {
+          autoScrollFrame = null;
+          return;
+        }
+
+        viewport.scrollLeft +=
+          autoScrollVelocity(
+            autoScrollPointerX - autoScrollOriginX);
+
+        viewport.scrollTop +=
+          autoScrollVelocity(
+            autoScrollPointerY - autoScrollOriginY);
+
+        autoScrollFrame =
+          requestAnimationFrame(autoScrollTick);
+      }
+
+      function startAutoScroll(event) {
+        autoScrollActive = true;
+        autoScrollOriginX = event.clientX;
+        autoScrollOriginY = event.clientY;
+        autoScrollPointerX = event.clientX;
+        autoScrollPointerY = event.clientY;
+
+        autoScrollIndicator.style.left =
+          event.clientX + "px";
+        autoScrollIndicator.style.top =
+          event.clientY + "px";
+        autoScrollIndicator.classList.add("active");
+        viewport.classList.add("auto-scrolling");
+
+        if (autoScrollFrame === null) {
+          autoScrollFrame =
+            requestAnimationFrame(autoScrollTick);
+        }
+      }
+
+      function stopAutoScroll() {
+        if (!autoScrollActive
+            && autoScrollFrame === null)
+        {
+          return;
+        }
+
+        autoScrollActive = false;
+        viewport.classList.remove("auto-scrolling");
+        autoScrollIndicator.classList.remove("active");
+
+        if (autoScrollFrame !== null) {
+          cancelAnimationFrame(autoScrollFrame);
+          autoScrollFrame = null;
+        }
+      }
+
+      viewport.addEventListener(
+        "pointerdown",
+        event => {
+          if (event.button === 0) {
+            beginLeftPan(event);
+            return;
+          }
+
+          if (event.button !== 1) {
+            return;
+          }
+
+          event.preventDefault();
+
+          if (autoScrollActive) {
+            stopAutoScroll();
+          } else {
+            startAutoScroll(event);
+          }
+        });
+
+      viewport.addEventListener(
+        "pointermove",
+        updateLeftPan);
+
+      viewport.addEventListener(
+        "pointerup",
+        endLeftPan);
+
+      viewport.addEventListener(
+        "pointercancel",
+        endLeftPan);
+
+      window.addEventListener(
+        "pointermove",
+        event => {
+          if (!autoScrollActive) {
+            return;
+          }
+
+          autoScrollPointerX = event.clientX;
+          autoScrollPointerY = event.clientY;
+        });
+
+      viewport.addEventListener(
+        "mousedown",
+        event => {
+          if (event.button === 1) {
+            event.preventDefault();
+          }
+        });
+
+      viewport.addEventListener(
+        "auxclick",
+        event => {
+          if (event.button === 1) {
+            event.preventDefault();
+          }
+        });
+
+      applyDisplayMode();
+      applyZoom(1);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "Module.Verification.StateSnapshot.Tests",
+  "rootNamespace": "Module.Verification.StateSnapshot.Tests",
+  "references": ["Module.Verification.StateSnapshot"],
+  "autoReferenced": false,
+  "defineConstraints": ["NARRATIVE_DOTNET_TESTS"],
+  "noEngineReferences": true
+}

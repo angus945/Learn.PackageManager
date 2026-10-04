@@ -1,0 +1,8 @@
+{
+  "name": "Module.Verification.Evidence.Tests",
+  "rootNamespace": "Module.Verification.Evidence.Tests",
+  "references": ["Module.Verification.Evidence"],
+  "autoReferenced": false,
+  "defineConstraints": ["NARRATIVE_DOTNET_TESTS"],
+  "noEngineReferences": true
+}
