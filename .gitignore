@@ -137,5 +137,3 @@ InitTestScene*.unity*
 
 /Tools/Tool.RepositoryDependencyGraph/
 /Tools/Tool.RepositoryDependencyGraph-*/
-# Local PackageSet development checkout (distribution must not depend on it)
-/Learn.PackageSet.PackageManager/
