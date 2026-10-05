@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "bootstrapper": "Tool.PackageManager",
+  "catalogVersion": "2026.10.05-development-initialization",
+  "planId": "unity",
+  "initialSourceRoot": "Assets/CraftyRacoon/Managed",
+  "components": [
+    {
+      "id": "Module.PackageManagement",
+      "repository": "crafty-racoon/Module.PackageManagement",
+      "revision": "f9bed079b22e881cbbafe6a04cd1857eccaeb354",
+      "path": "Assets/CraftyRacoon/Managed/Modules/Module.PackageManagement"
+    },
+    {
+      "id": "Framework.PackageManagement",
+      "repository": "crafty-racoon/Framework.PackageManagement",
+      "revision": "82628e716b718da62130ef00b54b550590df9c7f",
+      "path": "Assets/CraftyRacoon/Managed/Frameworks/Framework.PackageManagement"
+    },
+    {
+      "id": "Framework.PackageManagement.Unity3D",
+      "repository": "crafty-racoon/Framework.PackageManagement.Unity3D",
+      "revision": "67e89d7576a0e4cacb4a7e0b9e80aa8ad3bda84b",
+      "path": "Assets/CraftyRacoon/Managed/Frameworks/Framework.PackageManagement.Unity3D"
+    }
+  ]
+}
