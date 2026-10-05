@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "repository": "crafty-racoon/Tool.PackageManager",
+  "files": [
+    ".github/workflows/release-from-version.yml",
+    ".gitignore",
+    "Bootstrap Package Management.cmd",
+    "Update Tool.PackageManager.cmd",
+    "v0.1.0-pre.4.md",
+    "bootstrap.ps1",
+    "update.ps1",
+    "README.md",
+    "config/bootstrap-plans.json",
+    "config/self-update-manifest.json",
+    "config/self-update-policy.json",
+    "docs/ARCHITECTURE.md",
+    "docs/BOOTSTRAP_PLAN_SCHEMA.md",
+    "docs/SELF_UPDATE.md"
+  ]
+}
