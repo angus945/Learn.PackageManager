@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "blockedRefs": [
+    {
+      "ref": "v0.1.0-pre.1",
+      "reason": "Known destructive self-update rollback bug. Do not install or downgrade to this release."
+    }
+  ]
+}

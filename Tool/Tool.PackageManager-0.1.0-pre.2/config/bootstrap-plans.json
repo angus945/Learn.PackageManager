@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "catalogVersion": "2026.10.04-unity-submodule",
+  "plans": [
+    {
+      "id": "dotnet",
+      "displayName": ".NET",
+      "description": "Bootstrap the host-neutral Package Management core for a .NET product root.",
+      "components": [
+        {
+          "id": "Module.PackageManagement",
+          "repository": "crafty-racoon/Module.PackageManagement",
+          "url": "https://github.com/crafty-racoon/Module.PackageManagement.git",
+          "revision": "d8212fa3950ab6cf753f1465fd23fed5266350c5"
+        },
+        {
+          "id": "Framework.PackageManagement",
+          "repository": "crafty-racoon/Framework.PackageManagement",
+          "url": "https://github.com/crafty-racoon/Framework.PackageManagement.git",
+          "revision": "e1b0862b0d2d77c44d28842ad58d695c87f37ffe"
+        }
+      ],
+      "plannedComponents": []
+    },
+    {
+      "id": "unity",
+      "displayName": "Unity",
+      "description": "Bootstrap Package Management as direct Git submodules inside a Unity project's Assets tree.",
+      "sourceRootConstraint": "unity-assets",
+      "components": [
+        {
+          "id": "Module.PackageManagement",
+          "repository": "crafty-racoon/Module.PackageManagement",
+          "url": "https://github.com/crafty-racoon/Module.PackageManagement.git",
+          "revision": "d8212fa3950ab6cf753f1465fd23fed5266350c5"
+        },
+        {
+          "id": "Framework.PackageManagement",
+          "repository": "crafty-racoon/Framework.PackageManagement",
+          "url": "https://github.com/crafty-racoon/Framework.PackageManagement.git",
+          "revision": "e1b0862b0d2d77c44d28842ad58d695c87f37ffe"
+        },
+        {
+          "id": "Framework.PackageManagement.Unity3D",
+          "repository": "crafty-racoon/Framework.PackageManagement.Unity3D",
+          "url": "https://github.com/crafty-racoon/Framework.PackageManagement.Unity3D.git",
+          "revision": "a092ac64d258048683f6237b8ee02faa6e5d6e1a"
+        }
+      ],
+      "plannedComponents": []
+    }
+  ]
+}

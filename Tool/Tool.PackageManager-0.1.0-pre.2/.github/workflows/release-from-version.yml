@@ -1,0 +1,83 @@
+name: Release from version document
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'v*.md'
+      - .github/workflows/release-from-version.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version document
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          version_docs=(v*.md)
+          if [[ ${#version_docs[@]} -ne 1 ]]; then
+            echo "Expected exactly one root version document matching v*.md; found ${#version_docs[@]}." >&2
+            printf '  %s\n' "${version_docs[@]:-<none>}" >&2
+            exit 1
+          fi
+
+          version_doc="${version_docs[0]}"
+          tag="${version_doc%.md}"
+
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Invalid version document name: $version_doc" >&2
+            exit 1
+          fi
+
+          if [[ "$tag" == *-* ]]; then
+            prerelease=true
+          else
+            prerelease=false
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version_doc=$version_doc" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION_DOC: ${{ steps.version.outputs.version_doc }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists: $TAG"
+            exit 0
+          fi
+
+          args=(
+            release create "$TAG"
+            --repo "$GITHUB_REPOSITORY"
+            --target "$GITHUB_SHA"
+            --title "$TAG"
+            --notes-file "$VERSION_DOC"
+          )
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh "${args[@]}"
