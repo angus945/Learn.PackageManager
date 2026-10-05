@@ -1,9 +1,0 @@
-[submodule "Module.PackageManagement"]
-	path = Assets/CraftyRacoon/Managed/Modules/Module.PackageManagement
-	url = https://github.com/crafty-racoon/Module.PackageManagement.git
-[submodule "Framework.PackageManagement"]
-	path = Assets/CraftyRacoon/Managed/Frameworks/Framework.PackageManagement
-	url = https://github.com/crafty-racoon/Framework.PackageManagement.git
-[submodule "Framework.PackageManagement.Unity3D"]
-	path = Assets/CraftyRacoon/Managed/Frameworks/Framework.PackageManagement.Unity3D
-	url = https://github.com/crafty-racoon/Framework.PackageManagement.Unity3D.git
