@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 3,
-  "repository": "https://github.com/angus945/Learn.PackageSet.PackageManager.git",
-  "trackingRef": "main",
-  "resolvedRevision": "a1f45320a48bb4b420251af6603e25090df643cc",
-  "managedProjectionRoot": "Assets/CraftyRacoon/Managed",
-  "needsPublish": false
+    "schemaVersion": 3,
+    "repository": "https://github.com/angus945/Learn.PackageSet.PackageManager.git",
+    "trackingRef": "main",
+    "resolvedRevision": "a1f45320a48bb4b420251af6603e25090df643cc",
+    "managedProjectionRoot": "Assets/CraftyRacoon/Managed",
+    "needsPublish": false
 }

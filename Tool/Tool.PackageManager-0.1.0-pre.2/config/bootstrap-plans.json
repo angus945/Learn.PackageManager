@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "2026.10.04-unity-submodule",
+  "catalogVersion": "2026.10.05-development-initialization",
   "plans": [
     {
       "id": "dotnet",
@@ -11,13 +11,13 @@
           "id": "Module.PackageManagement",
           "repository": "crafty-racoon/Module.PackageManagement",
           "url": "https://github.com/crafty-racoon/Module.PackageManagement.git",
-          "revision": "d8212fa3950ab6cf753f1465fd23fed5266350c5"
+          "revision": "f9bed079b22e881cbbafe6a04cd1857eccaeb354"
         },
         {
           "id": "Framework.PackageManagement",
           "repository": "crafty-racoon/Framework.PackageManagement",
           "url": "https://github.com/crafty-racoon/Framework.PackageManagement.git",
-          "revision": "e1b0862b0d2d77c44d28842ad58d695c87f37ffe"
+          "revision": "82628e716b718da62130ef00b54b550590df9c7f"
         }
       ],
       "plannedComponents": []
@@ -32,19 +32,19 @@
           "id": "Module.PackageManagement",
           "repository": "crafty-racoon/Module.PackageManagement",
           "url": "https://github.com/crafty-racoon/Module.PackageManagement.git",
-          "revision": "d8212fa3950ab6cf753f1465fd23fed5266350c5"
+          "revision": "f9bed079b22e881cbbafe6a04cd1857eccaeb354"
         },
         {
           "id": "Framework.PackageManagement",
           "repository": "crafty-racoon/Framework.PackageManagement",
           "url": "https://github.com/crafty-racoon/Framework.PackageManagement.git",
-          "revision": "e1b0862b0d2d77c44d28842ad58d695c87f37ffe"
+          "revision": "82628e716b718da62130ef00b54b550590df9c7f"
         },
         {
           "id": "Framework.PackageManagement.Unity3D",
           "repository": "crafty-racoon/Framework.PackageManagement.Unity3D",
           "url": "https://github.com/crafty-racoon/Framework.PackageManagement.Unity3D.git",
-          "revision": "a092ac64d258048683f6237b8ee02faa6e5d6e1a"
+          "revision": "37d51f1594bfa1422d425e420f9b576bd7b23b26"
         }
       ],
       "plannedComponents": []

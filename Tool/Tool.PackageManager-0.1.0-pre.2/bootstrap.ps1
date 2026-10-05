@@ -4,12 +4,15 @@ param(
     [string]$Plan,
     [string]$SourceRoot,
     [switch]$ListPlans,
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [switch]$UseBundledCatalog
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $CatalogPath = Join-Path $PSScriptRoot 'config\bootstrap-plans.json'
+$ToolRepository = 'crafty-racoon/Tool.PackageManager'
+$DevelopmentCatalogRef = 'main'
 
 function Write-Heading {
     param([string]$Text)
@@ -119,34 +122,107 @@ function Resolve-TargetGitRoot {
     return $root
 }
 
-function Read-BootstrapCatalog {
-    if (-not (Test-Path -LiteralPath $CatalogPath)) {
-        throw "Bootstrap catalog not found: $CatalogPath"
+function ConvertFrom-BootstrapCatalogJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$Json,
+        [Parameter(Mandatory = $true)][string]$Context
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Json)) {
+        throw "$Context returned an empty bootstrap catalog."
     }
 
-    $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
+    try {
+        $catalog = $Json | ConvertFrom-Json
+    }
+    catch {
+        throw "$Context contains invalid JSON: $($_.Exception.Message)"
+    }
+
     if ($catalog.schemaVersion -ne 2) {
-        throw "Unsupported bootstrap catalog schemaVersion: $($catalog.schemaVersion)"
+        throw "$Context uses unsupported bootstrap catalog schemaVersion: $($catalog.schemaVersion)"
     }
 
     if (-not $catalog.plans -or $catalog.plans.Count -eq 0) {
-        throw 'Bootstrap catalog contains no plans.'
+        throw "$Context contains no bootstrap plans."
     }
 
     $planIds = @{}
     foreach ($candidate in $catalog.plans) {
         if ([string]::IsNullOrWhiteSpace($candidate.id)) {
-            throw 'Every bootstrap plan requires an id.'
+            throw "$Context contains a plan without an id."
         }
 
         if ($planIds.ContainsKey($candidate.id)) {
-            throw "Duplicate bootstrap plan id: $($candidate.id)"
+            throw "$Context contains duplicate bootstrap plan id: $($candidate.id)"
         }
 
         $planIds[$candidate.id] = $true
     }
 
     return $catalog
+}
+
+function Read-BundledBootstrapCatalog {
+    if (-not (Test-Path -LiteralPath $CatalogPath)) {
+        throw "Bootstrap catalog not found: $CatalogPath"
+    }
+
+    $json = Get-Content -LiteralPath $CatalogPath -Raw
+    return ConvertFrom-BootstrapCatalogJson -Json $json -Context 'Bundled bootstrap catalog'
+}
+
+function Read-DevelopmentBootstrapCatalog {
+    Write-Heading 'Refresh bootstrap catalog'
+
+    $revisionOutput = Invoke-CheckedCommand -Command 'gh' -Arguments @(
+        'api',
+        "repos/$ToolRepository/commits/$DevelopmentCatalogRef",
+        '--jq',
+        '.sha'
+    ) -Capture
+
+    $revision = ($revisionOutput | Select-Object -First 1).Trim()
+    if ($revision -notmatch '^[0-9a-fA-F]{40}$') {
+        throw "Could not resolve Tool.PackageManager main to an exact commit."
+    }
+
+    $catalogOutput = Invoke-CheckedCommand -Command 'gh' -Arguments @(
+        'api',
+        '-H',
+        'Accept: application/vnd.github.raw+json',
+        "repos/$ToolRepository/contents/config/bootstrap-plans.json?ref=$DevelopmentCatalogRef"
+    ) -Capture
+
+    $json = $catalogOutput -join [Environment]::NewLine
+    $catalog = ConvertFrom-BootstrapCatalogJson -Json $json -Context 'Tool.PackageManager main bootstrap catalog'
+
+    Write-Host "Catalog source : $ToolRepository@$DevelopmentCatalogRef"
+    Write-Host "Catalog commit : $revision"
+    Write-Host "Catalog version: $($catalog.catalogVersion)"
+
+    return [pscustomobject]@{
+        Catalog = $catalog
+        Source = "$ToolRepository@$DevelopmentCatalogRef"
+        Revision = $revision
+    }
+}
+
+function Resolve-BootstrapCatalog {
+    if ($UseBundledCatalog) {
+        $catalog = Read-BundledBootstrapCatalog
+        Write-Heading 'Bootstrap catalog'
+        Write-Host 'Catalog source : bundled with this Tool version'
+        Write-Host "Catalog version: $($catalog.catalogVersion)"
+
+        return [pscustomobject]@{
+            Catalog = $catalog
+            Source = 'bundled'
+            Revision = ''
+        }
+    }
+
+    return Read-DevelopmentBootstrapCatalog
 }
 
 function Show-Plans {
@@ -755,6 +831,130 @@ function Test-RegisteredSubmodulePath {
     return $false
 }
 
+function Get-RelativeParentPath {
+    param([string]$RelativePath)
+
+    $normalized = $RelativePath.Trim().Replace('\', '/').TrimEnd('/')
+    $separatorIndex = $normalized.LastIndexOf('/')
+    if ($separatorIndex -lt 0) {
+        return ''
+    }
+
+    return $normalized.Substring(0, $separatorIndex)
+}
+
+function Find-RegisteredComponentPath {
+    param(
+        [string]$GitRoot,
+        $Component
+    )
+
+    $gitmodules = Join-Path $GitRoot '.gitmodules'
+    if (-not (Test-Path -LiteralPath $gitmodules -PathType Leaf)) {
+        return $null
+    }
+
+    $lines = & git -C $GitRoot config -f .gitmodules --get-regexp '^submodule\..*\.url' 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $lines) {
+        return $null
+    }
+
+    $matches = @()
+
+    foreach ($line in @($lines)) {
+        $parts = $line -split '\s+', 2
+        if ($parts.Count -ne 2) {
+            continue
+        }
+
+        $urlKey = $parts[0].Trim()
+        $urlText = $parts[1].Trim()
+        if (-not $urlKey.EndsWith('.url', [System.StringComparison]::Ordinal)) {
+            continue
+        }
+
+        if (-not (Test-GitRepositoryIdentityMatch -Actual $urlText -Expected $Component.url)) {
+            continue
+        }
+
+        $sectionKey = $urlKey.Substring(0, $urlKey.Length - '.url'.Length)
+        $path = & git -C $GitRoot config -f .gitmodules --get "$sectionKey.path" 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $path) {
+            throw "Registered Package Management submodule '$sectionKey' has no path."
+        }
+
+        $matches += (($path | Select-Object -First 1).Trim().Replace('\', '/'))
+    }
+
+    if ($matches.Count -gt 1) {
+        throw "Multiple registered submodules match '$($Component.repository)': $($matches -join ', ')"
+    }
+
+    if ($matches.Count -eq 1) {
+        return $matches[0]
+    }
+
+    return $null
+}
+
+function Resolve-ExistingPackageManagerSourceRoot {
+    param(
+        [string]$GitRoot,
+        $SelectedPlan
+    )
+
+    $observed = @()
+
+    foreach ($component in $SelectedPlan.components) {
+        $path = Find-RegisteredComponentPath -GitRoot $GitRoot -Component $component
+        if ([string]::IsNullOrWhiteSpace($path)) {
+            continue
+        }
+
+        $parent = Get-RelativeParentPath -RelativePath $path
+        if ([string]::IsNullOrWhiteSpace($parent)) {
+            throw "Existing Package Management submodule '$path' is at the Git root. Automatic update requires a shared source folder."
+        }
+
+        $expectedPath = "$parent/$($component.id)"
+        if (-not [System.StringComparer]::OrdinalIgnoreCase.Equals($path, $expectedPath)) {
+            throw "Existing Package Management submodule '$path' does not use the expected component folder '$($component.id)'. Automatic update will not guess a new layout."
+        }
+
+        $observed += [pscustomobject]@{
+            Id = $component.id
+            Path = $path
+            Root = $parent
+        }
+    }
+
+    if ($observed.Count -eq 0) {
+        return $null
+    }
+
+    $roots = @($observed | Select-Object -ExpandProperty Root -Unique)
+    if ($roots.Count -ne 1) {
+        throw "Existing Package Management submodules are spread across multiple source roots: $($roots -join ', ')"
+    }
+
+    $sourceRoot = [string]$roots[0]
+
+    Write-Heading 'Existing Package Management submodules'
+    Write-Host "Reuse source root: $sourceRoot"
+
+    foreach ($component in $SelectedPlan.components) {
+        $existing = @($observed | Where-Object { $_.Id -eq $component.id })
+        if ($existing.Count -eq 1) {
+            Write-Host "  update : $($existing[0].Path)"
+        }
+        else {
+            Write-Host "  install: $sourceRoot/$($component.id)"
+        }
+    }
+
+    return $sourceRoot
+}
+
 function Get-SubmoduleGitDirectory {
     param(
         [string]$GitRoot,
@@ -1008,26 +1208,49 @@ function Write-HandoffPlan {
 }
 
 try {
-    $catalog = Read-BootstrapCatalog
+    Assert-Prerequisites
+
+    $catalogResolution = Resolve-BootstrapCatalog
+    $catalog = $catalogResolution.Catalog
 
     if ($ListPlans) {
         Show-Plans -Catalog $catalog
         exit 0
     }
 
-    Assert-Prerequisites
-
     $gitRoot = Resolve-TargetGitRoot -ExplicitProjectPath $ProjectPath
     $selectedPlan = Select-BootstrapPlan -Catalog $catalog -RequestedPlan $Plan
     Assert-Plan -SelectedPlan $selectedPlan
 
-    $initialSourceRoot = Resolve-InitialSourceRoot -GitRoot $gitRoot -RequestedSourceRoot $SourceRoot
-    Assert-SourceRootConstraint -SelectedPlan $selectedPlan -GitRoot $gitRoot -InitialSourceRoot $initialSourceRoot
+    $existingSourceRoot = Resolve-ExistingPackageManagerSourceRoot -GitRoot $gitRoot -SelectedPlan $selectedPlan
+    $updatingExisting = -not [string]::IsNullOrWhiteSpace($existingSourceRoot)
 
+    if ($updatingExisting) {
+        $initialSourceRoot = $existingSourceRoot
+
+        if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
+            $requestedSourceRoot = Normalize-RelativeSourceRoot -Path $SourceRoot
+            if (-not [System.StringComparer]::OrdinalIgnoreCase.Equals($requestedSourceRoot, $initialSourceRoot)) {
+                Write-Host "Requested source root '$requestedSourceRoot' is ignored because Package Management submodules already exist at '$initialSourceRoot'."
+            }
+        }
+    }
+    else {
+        $initialSourceRoot = Resolve-InitialSourceRoot -GitRoot $gitRoot -RequestedSourceRoot $SourceRoot
+    }
+
+    Assert-SourceRootConstraint -SelectedPlan $selectedPlan -GitRoot $gitRoot -InitialSourceRoot $initialSourceRoot
     Show-ResolvedLayout -GitRoot $gitRoot -SelectedPlan $selectedPlan -InitialSourceRoot $initialSourceRoot
 
     if (-not $NonInteractive) {
-        $confirmation = Read-Host 'Install this initial layout? [Y/n]'
+        $prompt = if ($updatingExisting) {
+            'Update the existing Package Management submodules to this plan? [Y/n]'
+        }
+        else {
+            'Install this initial layout? [Y/n]'
+        }
+
+        $confirmation = Read-Host $prompt
         if (-not [string]::IsNullOrWhiteSpace($confirmation) -and $confirmation -notmatch '^[Yy]') {
             Write-Host 'Cancelled.'
             exit 0

@@ -28,20 +28,22 @@ find target Git root
         ↓
 select plan with Up / Down + Enter
         ↓
-browse folders from Git root
+detect matching Package Management submodules in .gitmodules
         ↓
-select existing folder → enter it
+already present → reuse their source root and update exact revisions
         ↓
-[+] Create new folder here → finalizes initial source root
+not present → browse/create the initial source root
         ↓
 validate host source-root constraint, if any
         ↓
 preview resolved paths
         ↓
-install exact-revision submodules
+update existing / install missing exact-revision submodules
         ↓
 write bootstrap handoff
 ~~~
+
+If the target repository already registers Package Management submodules whose repository identities match the selected plan, bootstrap reuses their current shared source root instead of asking for a new installation folder. Existing components are synchronized and moved to the catalog's exact revisions; missing components are installed beside them. Duplicate matches, nonstandard component folder names, or manager components spread across multiple roots fail instead of being guessed.
 
 At each folder level the CLI shows the current Git-root-relative path and immediate child directories using their complete project-relative paths.
 
@@ -58,6 +60,10 @@ When the current directory is below the Git root, the menu also includes:
 While editing `New folder name`, `Esc` returns to the folder menu at the same current directory. It does not cancel the whole bootstrap.
 
 The plan does not define a fixed installation folder. A host plan may declare a placement constraint that is required for that host to load the source.
+
+Before reading the plan, bootstrap now refreshes the catalog from `Tool.PackageManager/main` by default. This keeps Development bootstrap aligned with the current coordinated exact revisions without requiring a separate Tool self-update first. The component checkouts are still exact SHAs from that catalog; bootstrap does not independently follow each component repository's `main`.
+
+Use `-UseBundledCatalog` to opt out of the Development refresh and use the catalog shipped with the installed Tool version instead.
 
 After bootstrap, later relocation or reorganization belongs to Framework.PackageManagement, not this Tool.
 
