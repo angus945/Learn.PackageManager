@@ -1,0 +1,19 @@
+{
+  "name": "Framework.PackageManagement.Unity3D.Editor",
+  "rootNamespace": "CraftyRacoon.PackageManagement.Unity3D.Editor",
+  "references": [
+    "Module.PackageManagement",
+    "Framework.PackageManagement"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

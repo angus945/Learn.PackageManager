@@ -1,0 +1,17 @@
+name: Development contracts
+on:
+  push:
+    branches: [main, codex/packageset-development-initialization, codex/pm-v2-module-20261011]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet run --project tests/Development.Contracts/Development.Contracts.csproj --configuration Release

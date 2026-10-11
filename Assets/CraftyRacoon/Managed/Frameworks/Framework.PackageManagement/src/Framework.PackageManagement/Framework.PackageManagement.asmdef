@@ -1,0 +1,9 @@
+{
+  "name": "Framework.PackageManagement",
+  "rootNamespace": "CraftyRacoon.PackageManagement.Framework",
+  "references": [
+    "Module.PackageManagement"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

@@ -1,0 +1,23 @@
+name: Development offline contracts
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-apply:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test V2 workflow surface contracts
+        shell: powershell
+        run: ./tests/WorkflowSurface.Contracts.ps1
+      - name: Test strict binding JSON contracts
+        shell: powershell
+        run: dotnet run --project ./tests/StrictJson.Contracts/StrictJson.Contracts.csproj
+      - name: Test real Git and NTFS backing on disposable fixtures
+        shell: powershell
+        run: ./tests/OfflineApply.Contracts.ps1

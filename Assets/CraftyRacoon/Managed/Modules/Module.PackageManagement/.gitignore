@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+# Code-only sources: Project snapshots preserve Unity GUID metadata.
+*.meta

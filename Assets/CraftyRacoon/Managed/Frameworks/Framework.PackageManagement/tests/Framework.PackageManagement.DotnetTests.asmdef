@@ -1,0 +1,6 @@
+{
+  "name": "Framework.PackageManagement.DotnetTests",
+  "includePlatforms": ["Editor"],
+  "defineConstraints": ["CRAFTYRACOON_DOTNET_CONTRACT_TESTS"],
+  "autoReferenced": false
+}
